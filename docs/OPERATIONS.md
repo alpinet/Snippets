@@ -28,6 +28,8 @@ Nothing secret is committed. `.env` is gitignored; `.env.example` lists the name
 | `EXPO_PUBLIC_SENTRY_DSN` | EAS env vars | Different Sentry environment tag per variant |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | EAS env vars, *sensitive* visibility | Source-map upload; dev builds skip it |
 | Apple / Google OAuth secrets | Supabase dashboard → Auth → Providers | Separate clients for staging and prod |
+| `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (.p8 contents) | Supabase → Edge Functions → Secrets | Used by `apple-auth` and `delete-account` to revoke Sign in with Apple tokens |
+| Moderation webhook URL | `app_config` table, key `moderation_webhook_url` | Slack or Discord incoming webhook; new reports post there |
 
 Use **different keys per environment**. Never copy a production key into staging.
 
@@ -70,7 +72,8 @@ Server-side, in `20261002000000_hardening.sql` and `config.toml`:
 
 ## Moderation
 
-Reports land in `public.reports`. Check them daily (App Store Guideline 1.2 expects action within 24 hours). Remove offending content in the Table editor and set `resolved_at`. Consider a Database Webhook on insert that emails you.
+Reports land in `public.reports`, and each one pings the moderation webhook once it's set:
+`insert into app_config values ('moderation_webhook_url', 'https://hooks.slack.com/services/…');` Check them daily (App Store Guideline 1.2 expects action within 24 hours). Remove offending content in the Table editor and set `resolved_at`. Consider a Database Webhook on insert that emails you.
 
 ## Backups: test a restore before you need one
 
@@ -81,6 +84,20 @@ Reports land in `public.reports`. Check them daily (App Store Guideline 1.2 expe
   3. Open the staging app pointed at it.
   4. Write down how long it took.
 - **Storage objects (photos) aren't in database backups.** Pro includes storage. Otherwise schedule a periodic copy of the `media` bucket.
+
+## Analytics (first-party)
+
+There's no third-party SDK. The app logs a handful of content-free events into `app_events`, and the metrics are SQL views in the `analytics` schema. The public API doesn't expose that schema; query it in the Supabase SQL editor:
+
+```sql
+select * from analytics.weekly_participation limit 12;   -- saved vs shared per week
+select * from analytics.reciprocal_sharing limit 12;     -- sharers whose friends shared too
+select * from analytics.cohort_retention;                -- signup cohort × weeks since signup
+select * from analytics.view_after_share limit 12;       -- looked at friends after sharing
+select percentile_cont(0.5) within group (order by weeks_kept) from analytics.archive_depth;
+```
+
+See `docs/BUSINESS.md` for what "good" looks like.
 
 ## Time
 

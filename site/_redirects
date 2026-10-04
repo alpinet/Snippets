@@ -1,0 +1,5 @@
+# Netlify / Cloudflare Pages
+/invite/*  /invite.html  200
+/privacy   /privacy.html 200
+/terms     /terms.html   200
+/support   /support.html 200

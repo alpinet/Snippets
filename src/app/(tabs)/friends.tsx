@@ -1,7 +1,7 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Lock, UserPlus } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chapters } from '../../components/friends/Chapters';
@@ -11,6 +11,7 @@ import { SharedWeek } from '../../components/friends/SharedWeek';
 import {
   Avatar, Card, EmptyState, ErrorNote, Hairline, Loading, PrimaryButton, Screen, ScreenHeader, TextButton,
 } from '../../components/ui';
+import { track } from '../../lib/analytics';
 import { useFriendsWeek, useMe, useMyWeek, useRequests } from '../../lib/queries';
 import { formatWeekRange, isSunday, socialWeekStart } from '../../lib/week';
 import { colors, iconStroke, type } from '../../theme';
@@ -51,6 +52,14 @@ export default function Friends() {
   const notPosted = all.filter((f) => !f.posted);
   const locked = all.filter((f) => f.posted && !f.unlocked);
   const open = all.filter((f) => f.unlocked && f.snippets.length);
+
+  // Reciprocity metric (§34): did people look at friends' weeks after sharing theirs?
+  const hasOpen = open.length > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (hasOpen) track('friends_viewed');
+    }, [hasOpen]),
+  );
 
   const refresh = () => Promise.all([week.refetch(), mine.refetch(), requests.refetch()]);
 

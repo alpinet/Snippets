@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
@@ -12,7 +13,7 @@ import { prepareForUpload } from '../media';
 import type { ISODate } from '../week';
 import type {
   Api, Comment, FriendRequest, FriendWeek, LocalMedia, MediaItem, Profile, ReactionKind,
-  ReportTarget, Session, Settings, Snippet, SnippetInput, Week, WeekStatus,
+  AnalyticsEvent, ReportTarget, Session, Settings, Snippet, SnippetInput, Week, WeekStatus,
 } from './types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -196,6 +197,12 @@ export class SupabaseApi implements Api {
     if (!cred.identityToken) throw new Error('Apple didn’t return a sign-in token');
     const { error } = await this.sb.auth.signInWithIdToken({ provider: 'apple', token: cred.identityToken, nonce: rawNonce });
     fail(error);
+    // Keep a revocable Apple token server-side so account deletion can revoke it. Best effort.
+    if (cred.authorizationCode) {
+      this.sb.functions
+        .invoke('apple-auth', { body: { code: cred.authorizationCode, clientId: Constants.expoConfig?.ios?.bundleIdentifier } })
+        .catch(() => {});
+    }
     // Apple only shares the name on first sign-in.
     const name = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(' ');
     if (name) {
@@ -293,6 +300,7 @@ export class SupabaseApi implements Api {
       notifySunday: data.notify_sunday,
       notifyNudges: data.notify_nudges,
       notifyFriendPosted: data.notify_friend_posted,
+      notifyReplies: data.notify_replies,
     };
   }
 
@@ -302,6 +310,7 @@ export class SupabaseApi implements Api {
     if (s.notifySunday !== undefined) patch.notify_sunday = s.notifySunday;
     if (s.notifyNudges !== undefined) patch.notify_nudges = s.notifyNudges;
     if (s.notifyFriendPosted !== undefined) patch.notify_friend_posted = s.notifyFriendPosted;
+    if (s.notifyReplies !== undefined) patch.notify_replies = s.notifyReplies;
     const { error } = await this.sb.from('user_private').update(patch).eq('user_id', uid);
     fail(error);
   }
@@ -644,5 +653,11 @@ export class SupabaseApi implements Api {
   async blockUser(userId: string) {
     const { error } = await this.sb.rpc('block_user', { target: userId });
     fail(error);
+  }
+
+  async track(name: AnalyticsEvent, props?: Record<string, number | string | boolean>) {
+    const { data } = await this.sb.auth.getSession();
+    if (!data.session) return;
+    await this.sb.from('app_events').insert({ name, props: props ?? {} });
   }
 }

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BackBar } from '../../components/BackBar';
-import { InviteButton, UserSearch } from '../../components/FriendFinder';
+import { InviteButton, InviteCodeEntry, UserSearch } from '../../components/FriendFinder';
 import { Avatar, Card, Hairline, Screen, SectionLabel, TextButton } from '../../components/ui';
 import { api } from '../../lib/api';
 import { invalidateFriends, useFriends, useRequests } from '../../lib/queries';
@@ -50,6 +50,7 @@ export default function ManageFriends() {
           Snippets works best with a handful of people you actually want to keep up with.
         </Text>
         <InviteButton />
+        <InviteCodeEntry />
         <View style={{ height: 14 }} />
         <UserSearch />
 

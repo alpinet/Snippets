@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { REACTIONS, type FriendWeek, type Snippet } from '../../lib/api';
-import { useNudge } from '../../lib/queries';
+import { shareInvite } from '../../lib/invite';
+import { useFriends, useNudge, useSettings } from '../../lib/queries';
 import { colors, type } from '../../theme';
 import { Avatar, TextButton } from '../ui';
 
@@ -58,6 +59,9 @@ export function MomentMeta({ snippet, style }: { snippet: Snippet; style?: objec
 export function ClosingNote({ notPosted, sunday, text = 'That’s everyone’s week' }: {
   notPosted: FriendWeek[]; sunday: boolean; text?: string;
 }) {
+  const friends = useFriends();
+  const settings = useSettings();
+  const few = (friends.data?.length ?? 99) < 3;
   return (
     <View style={styles.closing}>
       <View style={styles.closingRule}>
@@ -79,6 +83,12 @@ export function ClosingNote({ notPosted, sunday, text = 'That’s everyone’s w
           </Text>
         )
       ) : null}
+      {few && settings.data ? (
+        <View style={styles.invite}>
+          <Text style={[type.small, { textAlign: 'center' }]}>Weeks are better with a few more people.</Text>
+          <TextButton title="Invite someone" onPress={() => shareInvite(settings.data!.inviteCode)} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -87,6 +97,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   closing: { alignItems: 'center', marginTop: 32, paddingHorizontal: 8 },
+  invite: { alignItems: 'center', gap: 6, marginTop: 22 },
   closingRule: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
   rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
 });

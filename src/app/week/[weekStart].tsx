@@ -1,14 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { Plus } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Plus, Share } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BackBar } from '../../components/BackBar';
 import { SnippetCard } from '../../components/social';
 import { Card, ErrorNote, Loading, PrimaryButton, Screen } from '../../components/ui';
 import { api } from '../../lib/api';
-import { openEditor } from '../../lib/nav';
+import { openEditor, openRecap } from '../../lib/nav';
 import { invalidateSnippets, useMe, useMyWeek } from '../../lib/queries';
-import { currentWeekStart, formatWeekRange } from '../../lib/week';
+import { addDays, currentWeekStart, formatWeekRange } from '../../lib/week';
 import { colors, iconStroke, type } from '../../theme';
 
 export default function MyWeek() {
@@ -27,7 +27,22 @@ export default function MyWeek() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BackBar title={formatWeekRange(weekStart)} />
+      <BackBar
+        title={formatWeekRange(weekStart)}
+        right={
+          n ? (
+            <Pressable
+              hitSlop={12}
+              accessibilityLabel="Share this week as an image"
+              onPress={() =>
+                openRecap({ from: weekStart, to: addDays(weekStart, 6), title: `My week · ${formatWeekRange(weekStart)}` })
+              }
+            >
+              <Share size={22} color={colors.ink} strokeWidth={iconStroke} />
+            </Pressable>
+          ) : null
+        }
+      />
       <Screen contentStyle={{ paddingTop: 8 }}>
         {week.isLoading ? (
           <Loading />

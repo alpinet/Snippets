@@ -4,15 +4,17 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { AuthProvider, takePendingInvite, useAuth } from '../lib/auth';
 import { OnboardingContext } from '../lib/onboarding';
+import { track } from '../lib/analytics';
+import { redeemInvite } from '../lib/invite';
 import { identify, initMonitoring, reportError, wrapRoot } from '../lib/monitoring';
 import { registerForPush, useNotificationRouting } from '../lib/push';
-import { invalidateFriends, keys, queryClient } from '../lib/queries';
+import { keys, queryClient } from '../lib/queries';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { PrimaryButton } from '../components/ui';
 import { colors, type } from '../theme';
@@ -75,15 +77,9 @@ function Gate() {
   useEffect(() => {
     if (!inApp) return;
     registerForPush().catch(() => {});
-    takePendingInvite().then(async (code) => {
-      if (!code) return;
-      try {
-        const friend = await api.acceptInvite(code);
-        await invalidateFriends();
-        Alert.alert('You’re friends now', `You and ${friend.displayName} can now share weeks.`);
-      } catch (e) {
-        Alert.alert('Invite link', e instanceof Error ? e.message : 'That invite didn’t work.');
-      }
+    track('app_open');
+    takePendingInvite().then((code) => {
+      if (code) redeemInvite(code);
     });
   }, [inApp]);
 
@@ -107,6 +103,7 @@ function Gate() {
           <Stack.Screen name="friend/[id]" />
           <Stack.Screen name="friends/manage" />
           <Stack.Screen name="backfill" />
+          <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
           <Stack.Screen name="settings/profile" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Screen name="invite/[code]" />

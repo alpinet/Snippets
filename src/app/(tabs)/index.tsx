@@ -3,9 +3,11 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CalendarClock, Check, Plus, Sparkles } from 'lucide-react-native';
 import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { GettingStartedCard, LastWeekCard } from '../../components/HomeCards';
 import { MediaThumb } from '../../components/media';
 import { Card, ErrorNote, Loading, PrimaryButton, Screen, ScreenHeader } from '../../components/ui';
 import { api, type Snippet } from '../../lib/api';
+import { track } from '../../lib/analytics';
 import { openEditor } from '../../lib/nav';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
 import { useOnline } from '../../lib/useOnline';
@@ -30,6 +32,7 @@ export default function Home() {
     mutationFn: () => api.publishWeek(wk),
     onSuccess: async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      track('week_shared', { moments: count });
       await invalidateSnippets();
       router.navigate('/friends');
     },
@@ -54,6 +57,8 @@ export default function Home() {
       <ScreenHeader large title="Snippets" subline={`This week · ${formatWeekRange(wk)}`} />
 
       <CheckInBanner weekStart={wk} sunday={sunday} published={published} />
+      <LastWeekCard weekStart={wk} />
+      <GettingStartedCard weekStart={wk} momentsThisWeek={count} />
       <PromptCard count={count} sunday={sunday} published={published} />
 
       {week.isLoading ? (

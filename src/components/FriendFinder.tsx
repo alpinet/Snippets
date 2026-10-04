@@ -1,9 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link2, Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { api } from '../lib/api';
-import { inviteLink } from '../lib/config';
+import { parseInviteCode, redeemInvite, shareInvite } from '../lib/invite';
 import { invalidateFriends, useSettings } from '../lib/queries';
 import { colors, iconStroke, radius, type } from '../theme';
 import { Avatar, SecondaryButton, TextButton } from './ui';
@@ -15,13 +15,37 @@ export function InviteButton() {
       title="Share your invite link"
       icon={<Link2 size={18} color={colors.ink} strokeWidth={iconStroke} />}
       disabled={!settings.data}
-      onPress={() =>
-        settings.data &&
-        Share.share({
-          message: `Join me on Snippets — a few moments from our weeks, shared on Sundays. ${inviteLink(settings.data.inviteCode)}`,
-        })
-      }
+      onPress={() => settings.data && shareInvite(settings.data.inviteCode)}
     />
+  );
+}
+
+/** For people who installed from an invite link: paste the link or type the code. */
+export function InviteCodeEntry() {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const code = parseInviteCode(value);
+  const submit = async () => {
+    if (!code) return;
+    setBusy(true);
+    if (await redeemInvite(code)) setValue('');
+    setBusy(false);
+  };
+  return (
+    <View style={styles.codeRow}>
+      <TextInput
+        value={value}
+        onChangeText={setValue}
+        placeholder="Have an invite code or link?"
+        placeholderTextColor={colors.ink3}
+        style={[styles.input, styles.codeInput]}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        onSubmitEditing={submit}
+      />
+      <TextButton title={busy ? 'Adding…' : 'Add'} onPress={submit} disabled={!code || busy} />
+    </View>
   );
 }
 
@@ -93,5 +117,10 @@ const styles = StyleSheet.create({
     height: 48,
   },
   input: { flex: 1, fontSize: 16, color: colors.ink },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  codeInput: {
+    height: 44, paddingHorizontal: 14, borderRadius: radius.md - 2, backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.hairlineStrong,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10 },
 });

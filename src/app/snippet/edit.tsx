@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MediaThumb } from '../../components/media';
 import { TextButton } from '../../components/ui';
 import { api, type DraftMedia, type MediaItem } from '../../lib/api';
+import { track } from '../../lib/analytics';
 import { pickMedia } from '../../lib/media';
 import { useOnline } from '../../lib/useOnline';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
@@ -136,6 +137,7 @@ export default function EditSnippet() {
     },
     onSuccess: async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      track('moment_saved', { media: media.length, backfill: isPastWeek, edit: isEdit });
       await invalidateSnippets();
       router.back();
     },

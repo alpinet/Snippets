@@ -1,6 +1,6 @@
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InviteButton, UserSearch } from '../../components/FriendFinder';
+import { InviteButton, InviteCodeEntry, UserSearch } from '../../components/FriendFinder';
 import { PrimaryButton, TextButton } from '../../components/ui';
 import { useOnboarding } from '../../lib/onboarding';
 import { useFriends } from '../../lib/queries';
@@ -23,6 +23,7 @@ export default function OnboardingFriends() {
           A few close friends is perfect. Friendships are always mutual.
         </Text>
         <InviteButton />
+        <InviteCodeEntry />
         <View style={{ height: 16 }} />
         <UserSearch />
         {n ? (

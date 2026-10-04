@@ -3,10 +3,12 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { ChevronRight } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
-import { Alert, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Avatar, Card, Hairline, Screen, ScreenHeader, SectionLabel, TextButton } from '../../components/ui';
 import { api, demoApi, type Settings } from '../../lib/api';
-import { inviteLink, links } from '../../lib/config';
+import { links } from '../../lib/config';
+import { exportArchive } from '../../lib/exportArchive';
+import { shareInvite } from '../../lib/invite';
 import { keys, queryClient, useFriends, useMe, useSettings } from '../../lib/queries';
 import { addDays, currentWeekStart, isSunday, parseISODate, setClockOffset } from '../../lib/week';
 import { colors, iconStroke, type } from '../../theme';
@@ -24,10 +26,23 @@ export default function Profile() {
 
   const del = useMutation({ mutationFn: () => api.deleteAccount() });
 
-  const shareInvite = () => {
+  const [exporting, setExporting] = useState(false);
+  const onExport = async () => {
+    if (exporting || !me.data) return;
+    setExporting(true);
+    try {
+      await exportArchive(me.data, await api.myArchive());
+    } catch (e) {
+      Alert.alert('Couldn’t export', e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const onInvite = () => {
     const code = settings.data?.inviteCode;
     if (!code) return;
-    Share.share({ message: `Join me on Snippets — a few moments from our weeks, shared on Sundays. ${inviteLink(code)}` });
+    shareInvite(code);
   };
 
   const confirmDelete = () =>
@@ -68,7 +83,12 @@ export default function Profile() {
       <Card style={styles.group}>
         <Item label="Your friends" value={friends.data ? String(friends.data.length) : undefined} onPress={() => router.push('/friends/manage')} />
         <Hairline style={styles.sep} />
-        <Item label="Invite a friend" onPress={shareInvite} />
+        <Item label="Invite a friend" onPress={onInvite} />
+      </Card>
+
+      <SectionLabel style={styles.section}>Your archive</SectionLabel>
+      <Card style={styles.group}>
+        <Item label={exporting ? 'Making your scrapbook…' : 'Export as a PDF scrapbook'} onPress={onExport} />
       </Card>
 
       <SectionLabel style={styles.section}>Notifications</SectionLabel>
@@ -81,6 +101,12 @@ export default function Profile() {
         />
         <Hairline style={styles.sep} />
         <Toggle label="Nudges from friends" value={s?.notifyNudges} onChange={(v) => update.mutate({ notifyNudges: v })} />
+        <Hairline style={styles.sep} />
+        <Toggle
+          label="Replies to your moments"
+          value={s?.notifyReplies}
+          onChange={(v) => update.mutate({ notifyReplies: v })}
+        />
         <Hairline style={styles.sep} />
         <Toggle
           label="When friends share"

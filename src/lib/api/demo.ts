@@ -5,7 +5,7 @@ import {
   addDays, currentWeekStart, dayIndex, isSunday, now, today, weekStartOf, type ISODate,
 } from '../week';
 import type {
-  Api, Comment, FriendRequest, FriendWeek, MediaItem, Profile, ReactionKind, ReportTarget, Session,
+  AnalyticsEvent, Api, Comment, FriendRequest, FriendWeek, MediaItem, Profile, ReactionKind, ReportTarget, Session,
   Settings, Snippet, SnippetInput, Week, WeekStatus,
 } from './types';
 
@@ -28,6 +28,7 @@ type DB = {
   friendships: { id: string; requester: string; recipient: string; status: 'pending' | 'accepted' }[];
   nudges: { from: string; to: string; weekStart: ISODate }[];
   blocks?: string[];
+  events?: { name: AnalyticsEvent; props: Record<string, unknown>; at: string }[];
   reports?: (ReportTarget & { reason: string })[];
   settings: Settings;
 };
@@ -98,7 +99,7 @@ function seed(): DB {
       { id: 'f5', requester: 'dan', recipient: ME, status: 'pending' },
     ],
     nudges: [],
-    settings: { timezone: 'UTC', inviteCode: 'a1b2c3d4e5f6', notifySunday: true, notifyNudges: true, notifyFriendPosted: true },
+    settings: { timezone: 'UTC', inviteCode: 'a1b2c3d4e5f6', notifySunday: true, notifyNudges: true, notifyFriendPosted: true, notifyReplies: true },
   };
 
   const add = (userId: string, weekStart: ISODate, days: number[], status: WeekStatus, photos = [1, 2, 1]) => {
@@ -643,5 +644,17 @@ export class DemoApi implements Api {
     const db = await this.load();
     (db.blocks ??= []).push(userId);
     await this.removeFriend(userId);
+  }
+
+  async track(name: AnalyticsEvent, props?: Record<string, number | string | boolean>) {
+    const db = await this.load();
+    (db.events ??= []).push({ name, props: props ?? {}, at: now().toISOString() });
+    if (db.events.length > 200) db.events.splice(0, db.events.length - 200);
+    await this.save();
+  }
+
+  /** Test/dev helper: recorded analytics events. */
+  async recordedEvents() {
+    return [...((await this.load()).events ?? [])];
   }
 }

@@ -5,8 +5,9 @@ import type { Snippet } from '../lib/api';
 import {
   addDays, dayIndex, formatMonth, parseISODate, toISODate, today, weekStartOf, type ISODate,
 } from '../lib/week';
-import { colors, gutter, type } from '../theme';
-import { openEditor } from '../lib/nav';
+import { colors, gutter, iconStroke, type } from '../theme';
+import { Share } from 'lucide-react-native';
+import { openEditor, openRecap } from '../lib/nav';
 import { MediaThumb } from './media';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -62,7 +63,15 @@ function Month({ first, cell, byDay }: { first: ISODate; cell: number; byDay: Ma
       <View style={styles.monthHeader}>
         <Text style={[type.cardTitle, { fontSize: 18 }]}>{formatMonth(first)}</Text>
         {count ? (
-          <Text style={[type.small, { color: colors.accent }]}>{count} {count === 1 ? 'moment' : 'moments'}</Text>
+          <Pressable
+            hitSlop={10}
+            accessibilityLabel={`Share ${formatMonth(first)} as an image`}
+            onPress={() => openRecap({ from: first, to: addDays(first, daysInMonth - 1), title: `My ${formatMonth(first)}` })}
+            style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={[type.small, { color: colors.accent }]}>{count} {count === 1 ? 'moment' : 'moments'}</Text>
+            <Share size={14} color={colors.accent} strokeWidth={iconStroke} />
+          </Pressable>
         ) : (
           <Text style={type.small}>Nothing kept yet</Text>
         )}
@@ -123,6 +132,7 @@ function Month({ first, cell, byDay }: { first: ISODate; cell: number; byDay: Ma
 const styles = StyleSheet.create({
   weekdays: { flexDirection: 'row', gap: GAP, marginBottom: 6 },
   weekday: { fontSize: 11, fontWeight: '500', color: colors.ink3, textAlign: 'center' },
+  share: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   day: { borderRadius: 10, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },

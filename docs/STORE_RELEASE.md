@@ -9,7 +9,9 @@ These steps need your accounts and credentials. Everything in the code is alread
 - **Expo:** free, https://expo.dev
 
 ## 1. Pick final identifiers
-In `app.json`, replace the placeholder `com.snippets.app` in both `ios.bundleIdentifier` and `android.package` with an ID you own, such as `com.yourname.snippets`. Once you've published, these can't change.
+- **Bundle ID:** in `app.config.ts`, change `BUNDLE_ID` (now the placeholder `com.snippets.app`) to an ID you own, such as `com.yourname.snippets`. Dev and beta builds add `.dev` / `.beta` automatically. Once you've published, it can't change.
+- **Store name:** App Store names must be unique, and "Snippets" alone is very likely taken. Check App Store Connect when you create the app, and have a fallback ready, such as "Snippets: Weekly Scrapbook" or "Snippets — Friends' Weeks". The name on the home screen can stay "Snippets".
+- **Domain:** you'll host the privacy policy, terms, support page and invite links on it. Set it as `EXPO_PUBLIC_SITE_URL` in each EAS environment.
 
 ## 2. Backend (Supabase)
 1. Create a project. Note the **Project URL** and **anon key** (Settings → API).
@@ -53,13 +55,13 @@ eas env:create --name EXPO_PUBLIC_SITE_URL --value https://<your site> --environ
 - iOS: EAS creates the APNs key during the first build.
 - Android: add FCM V1 credentials with `eas credentials`, under Android → Google Service Account → FCM V1.
 
-## 4. Public pages (required by both stores)
-Host `docs/privacy-policy.md`, `docs/terms.md` and a simple support page (just an email is fine) at your `EXPO_PUBLIC_SITE_URL`. Both stores ask for the privacy URL.
-
-**Optional but recommended:** make invite links work before the app is installed.
-1. Host `https://<site>/invite/<code>` with a redirect to the stores.
-2. Add iOS Associated Domains and Android App Links (https://docs.expo.dev/linking/overview/).
-3. Set `EXPO_PUBLIC_INVITE_BASE_URL=https://<site>/invite/`.
+## 4. Public site: legal pages and invite links
+`site/` is a ready-made static site. Host it free on Netlify, Cloudflare Pages or Vercel; redirect and header files for each are included.
+1. Fill in `site/config.js`: the Supabase URL and anon key (both public), plus your store links.
+2. In `site/.well-known/apple-app-site-association`, put `YOUR_TEAM_ID.<bundle id>`. In `assetlinks.json`, put your package name and the SHA-256 of the Play app-signing key (Play Console → App integrity).
+3. Fill in the placeholders in `docs/privacy-policy.md` and `docs/terms.md`, then run `node site/build.mjs` to regenerate the pages. Put your email in `site/support.html`.
+4. Deploy. Check that `https://<site>/.well-known/apple-app-site-association` is served as JSON.
+5. Set `EXPO_PUBLIC_INVITE_BASE_URL=https://<site>/invite/` in EAS. Invite links then open the app when it's installed, and the landing page ("Alex invited you…", with the code and store buttons) when it isn't. New users can paste the code in onboarding.
 
 ## 5. Build and test
 **Local builds need Xcode 26.4 or newer** (Expo SDK 57's minimum). EAS cloud builds already use a current Xcode.
@@ -96,6 +98,22 @@ eas submit --platform android
 - **Content rating questionnaire:** users can interact and share content.
 - New personal developer accounts must run a **closed test with 12+ testers for 14 days** before production access.
 
+## App Review demo account
+Reviewers need a login that already has friends and a shared week:
+```bash
+SUPABASE_URL=… SUPABASE_ANON_KEY=… SUPABASE_SERVICE_ROLE_KEY=… REVIEWER_PASSWORD='…' \
+  node supabase/seed/create-reviewer.mjs
+```
+Paste `appreview@snippets.app` and the password into App Store Connect → App Review Information (and Play Console → App access). Re-run it the week of each submission so "last week" is fresh.
+
+## Pre-submission checklist (things only a real build can prove)
+- [ ] Sign in with Apple on a device. Then delete the account and confirm the app is gone from Settings → Apple ID → Sign in with Apple. This needs the `APPLE_*` secrets set on the `apple-auth` and `delete-account` functions; see OPERATIONS.
+- [ ] Google sign-in and email sign-up (with confirmation email) on iOS and Android.
+- [ ] Push notifications: a nudge, a reply, "friend shared", and the Sunday reminder (6 pm local) arrive on a real device.
+- [ ] An invite link opens the installed app; on a phone without the app it shows the landing page.
+- [ ] Upload a 15-second video and three photos on cellular. Turn on airplane mode mid-session and check the offline strip.
+- [ ] Export the PDF scrapbook and share a recap image.
+- [ ] Moderation: report something and confirm the webhook message arrives.
+
 ## Known gaps to close before a public launch
-- **Apple token revocation on account deletion:** Apple asks apps that use Sign in with Apple to revoke tokens. Add a call to `https://appleid.apple.com/auth/revoke` in the `delete-account` function, using the stored Apple refresh token.
 - **Server-side video transcoding:** today the device exports 720p H.264 before upload, which keeps files small. A server pipeline would guarantee it.

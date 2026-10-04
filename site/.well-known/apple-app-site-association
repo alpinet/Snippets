@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["YOUR_TEAM_ID.com.snippets.app"],
+        "components": [{ "/": "/invite/*", "comment": "Invite links open the app" }]
+      }
+    ]
+  }
+}

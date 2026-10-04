@@ -1,6 +1,7 @@
 // Permanently deletes the calling user's account, media and data.
 // Required by App Store Guideline 5.1.1(v) and Google Play's account deletion policy.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { appleConfigured, revoke } from '../_shared/apple.ts';
 
 // Called only by the mobile app, so no CORS headers: browsers can't call it cross-origin.
 Deno.serve(async (req) => {
@@ -11,6 +12,15 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
   const { data: { user }, error } = await admin.auth.getUser(jwt);
   if (error || !user) return new Response('Unauthorized', { status: 401 });
+
+  // Revoke Sign in with Apple, if they used it (Guideline 5.1.1(v)). Best effort: never block deletion.
+  if (appleConfigured()) {
+    const { data: secret } = await admin
+      .from('auth_secrets').select('apple_refresh_token, apple_client_id').eq('user_id', user.id).maybeSingle();
+    if (secret?.apple_refresh_token && secret.apple_client_id) {
+      await revoke(secret.apple_client_id, secret.apple_refresh_token).catch(() => false);
+    }
+  }
 
   // Remove every stored object under the user's folder in each bucket.
   for (const bucket of ['media', 'avatars']) {

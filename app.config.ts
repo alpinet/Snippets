@@ -14,6 +14,16 @@ const variant = {
   production: { name: 'Snippets', id: BUNDLE_ID, scheme: 'snippets' },
 }[VARIANT];
 
+// Universal Links / App Links: https://<site>/invite/<code> opens the app when installed.
+// Only production claims the real domain; set EXPO_PUBLIC_SITE_URL for each EAS environment.
+const SITE_HOST = (() => {
+  try {
+    return new URL(process.env.EXPO_PUBLIC_SITE_URL ?? '').host || null;
+  } catch {
+    return null;
+  }
+})();
+
 const base: ExpoConfig = {
   "name": "Snippets",
   "slug": "snippets",
@@ -88,6 +98,12 @@ const base: ExpoConfig = {
           ]
         },
         {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypeTracking": false,
+          "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAnalytics"]
+        },
+        {
           "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
           "NSPrivacyCollectedDataTypeLinked": true,
           "NSPrivacyCollectedDataTypeTracking": false,
@@ -160,8 +176,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...base,
   name: variant.name,
   scheme: variant.scheme,
-  ios: { ...base.ios, bundleIdentifier: variant.id },
-  android: { ...base.android, package: variant.id },
+  ios: {
+    ...base.ios,
+    bundleIdentifier: variant.id,
+    ...(SITE_HOST ? { associatedDomains: [`applinks:${SITE_HOST}`] } : null),
+  },
+  android: {
+    ...base.android,
+    package: variant.id,
+    ...(SITE_HOST
+      ? {
+          intentFilters: [
+            {
+              action: 'VIEW',
+              autoVerify: true,
+              data: [{ scheme: 'https', host: SITE_HOST, pathPrefix: '/invite' }],
+              category: ['BROWSABLE', 'DEFAULT'],
+            },
+          ],
+        }
+      : null),
+  },
   plugins: [
     ...(base.plugins ?? []),
     [

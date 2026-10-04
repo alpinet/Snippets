@@ -76,6 +76,7 @@ export type Settings = {
   notifySunday: boolean;
   notifyNudges: boolean;
   notifyFriendPosted: boolean;
+  notifyReplies: boolean;
 };
 
 /** Media chosen on-device, not yet uploaded. */
@@ -152,9 +153,16 @@ export interface Api {
   acceptInvite(code: string): Promise<Profile>;
   regenerateInviteCode(): Promise<string>;
 
+  // First-party analytics: event names and small counts only, never content.
+  track(name: AnalyticsEvent, props?: Record<string, number | string | boolean>): Promise<void>;
+
   // Safety
   report(target: ReportTarget, reason: string): Promise<void>;
   blockUser(userId: string): Promise<void>;
 }
+
+export type AnalyticsEvent =
+  | 'app_open' | 'friends_viewed' | 'invite_sent' | 'invite_accepted'
+  | 'recap_shared' | 'archive_exported' | 'moment_saved' | 'week_shared';
 
 export type ReportTarget = { userId: string; snippetId?: string; commentId?: string };
