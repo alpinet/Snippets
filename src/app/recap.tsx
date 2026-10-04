@@ -33,7 +33,7 @@ export default function Recap() {
   );
   const covers = moments.map((s) => s.media[0]).filter(Boolean).slice(0, 4);
   const cardW = width - gutter * 2;
-  const tile = (cardW - 28 * 2 - 10) / 2;
+  const tile = Math.floor((cardW - 28 * 2 - 10 - 2) / 2); // padding, gap, hairline border
   const multiDay = from.slice(0, 7) !== to.slice(0, 7) || moments.length > 3;
 
   const share = async () => {
@@ -51,7 +51,7 @@ export default function Recap() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BackBar title="Share as image" />
+      <BackBar modal title="Share as image" />
       {archive.isLoading ? (
         <Loading />
       ) : (

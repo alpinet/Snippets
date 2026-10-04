@@ -33,7 +33,7 @@ export function archiveHtml(me: Profile, weeks: Week[]): string {
           </div>`;
         })
         .join('');
-      return `${monthHeader}<section class="week"><h3>${esc(formatWeekRange(w.weekStart))}</h3>${moments}</section>`;
+      return `<section class="week">${monthHeader}<h3>${esc(formatWeekRange(w.weekStart))}</h3>${moments}</section>`;
     })
     .join('');
 
@@ -41,11 +41,11 @@ export function archiveHtml(me: Profile, weeks: Week[]): string {
 <style>
   @page { margin: 48px 44px; }
   body { font-family: -apple-system, Helvetica, sans-serif; color: #2E2926; }
-  .cover { height: 92vh; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover { padding-top: 280px; page-break-after: always; break-after: page; }
   .cover .mark { color: #BF6547; font-size: 28px; }
   .cover h1 { font-weight: 500; font-size: 44px; margin: 12px 0 6px; }
   .cover p { color: #857B73; font-size: 18px; margin: 0; }
-  h2.month { font-weight: 500; font-size: 26px; margin: 28px 0 8px; page-break-after: avoid; }
+  h2.month { font-weight: 500; font-size: 26px; margin: 10px 0 12px; }
   .week { break-inside: avoid; page-break-inside: avoid; border-top: 1px solid #eee5dd; padding-top: 14px; margin-bottom: 18px; }
   h3 { font-weight: 500; font-size: 15px; color: #857B73; margin: 0 0 10px; }
   .moment { margin-bottom: 16px; break-inside: avoid; }

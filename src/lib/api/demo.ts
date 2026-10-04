@@ -170,6 +170,8 @@ export class DemoApi implements Api {
     } catch {
       this.db = seed();
     }
+    // Fill settings added after this device's demo data was created.
+    this.db.settings.notifyReplies ??= true;
     this.sanitize(this.db);
     // Dev convenience (screenshots / QA): start signed in as the seeded user.
     if (process.env.EXPO_PUBLIC_DEMO_AUTOLOGIN === '1' && !this.db.session) {

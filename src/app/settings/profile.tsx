@@ -10,7 +10,7 @@ export default function EditProfile() {
   const me = useMe();
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar title="Edit profile" />
+      <BackBar modal title="Edit profile" />
       <ScrollView contentContainerStyle={{ padding: gutter, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         {me.data ? <ProfileForm initial={me.data} submitLabel="Save" onDone={() => router.back()} /> : <Loading />}
       </ScrollView>

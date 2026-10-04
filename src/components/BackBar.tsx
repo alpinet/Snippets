@@ -1,15 +1,17 @@
 import { router } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, gutter, iconStroke, type } from '../theme';
 
 /** Quiet top bar for pushed screens. */
-export function BackBar({ title, right }: { title?: string; right?: ReactNode }) {
+export function BackBar({ title, right, modal }: { title?: string; right?: ReactNode; modal?: boolean }) {
   const insets = useSafeAreaInsets();
+  // iOS page-sheet modals already sit below the status bar.
+  const top = modal && Platform.OS === 'ios' ? 14 : insets.top + 6;
   return (
-    <View style={[styles.bar, { paddingTop: insets.top + 6 }]}>
+    <View style={[styles.bar, { paddingTop: top }]}>
       <Pressable
         onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         hitSlop={12}
