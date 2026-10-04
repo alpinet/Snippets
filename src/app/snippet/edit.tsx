@@ -11,6 +11,7 @@ import { MediaThumb } from '../../components/media';
 import { TextButton } from '../../components/ui';
 import { api, type DraftMedia, type MediaItem } from '../../lib/api';
 import { pickMedia } from '../../lib/media';
+import { useOnline } from '../../lib/useOnline';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
 import {
   DAY_SHORT, currentWeekStart, formatWeekRange, parseISODate, today, weekDays, weekStartOf, type ISODate,
@@ -164,7 +165,8 @@ export default function EditSnippet() {
   };
 
   const days = useMemo(() => weekDays(weekStart), [weekStart]);
-  const canSave = media.length > 0 && !save.isPending;
+  const online = useOnline();
+  const canSave = media.length > 0 && !save.isPending && online;
   const saveLabel = save.isPending
     ? progress !== null && progress < 1 ? `Saving ${Math.round(progress * 100)}%` : 'Saving…'
     : 'Save';

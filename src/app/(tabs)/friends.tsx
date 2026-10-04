@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { Lock, UserPlus } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chapters } from '../../components/friends/Chapters';
-import { CardsLayout, NudgeRow, type FriendsLayoutProps } from '../../components/friends/common';
+import { NudgeRow, type FriendsLayoutProps } from '../../components/friends/common';
 import { Highlights } from '../../components/friends/Highlights';
 import { SharedWeek } from '../../components/friends/SharedWeek';
 import {
@@ -14,13 +15,13 @@ import { useFriendsWeek, useMe, useMyWeek, useRequests } from '../../lib/queries
 import { formatWeekRange, isSunday, socialWeekStart } from '../../lib/week';
 import { colors, iconStroke, type } from '../../theme';
 
-// TEMPORARY: compare layouts in the app, then keep one and delete this switcher.
+// Three ways to read the week; the choice is remembered on this device.
 const LAYOUTS = [
   { key: 'timeline', label: 'Our week' },
   { key: 'chapters', label: 'Chapters' },
   { key: 'highlights', label: 'Highlights' },
-  { key: 'cards', label: 'Cards' },
 ] as const;
+const LAYOUT_KEY = 'friends-layout';
 type LayoutKey = (typeof LAYOUTS)[number]['key'];
 
 export default function Friends() {
@@ -31,7 +32,18 @@ export default function Friends() {
   const mine = useMyWeek(wk);
   const requests = useRequests();
   const incoming = requests.data?.filter((r) => r.direction === 'incoming').length ?? 0;
-  const [layout, setLayout] = useState<LayoutKey>('timeline');
+  const [layout, setLayoutState] = useState<LayoutKey>('timeline');
+  useEffect(() => {
+    AsyncStorage.getItem(LAYOUT_KEY)
+      .then((v) => {
+        if (LAYOUTS.some((l) => l.key === v)) setLayoutState(v as LayoutKey);
+      })
+      .catch(() => {});
+  }, []);
+  const setLayout = (v: LayoutKey) => {
+    setLayoutState(v);
+    AsyncStorage.setItem(LAYOUT_KEY, v).catch(() => {});
+  };
   const scroller = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
@@ -154,8 +166,6 @@ function FriendsLayout({ kind, props, onJump }: { kind: LayoutKey; props: Friend
       return <Chapters {...props} onJump={onJump} />;
     case 'highlights':
       return <Highlights {...props} />;
-    case 'cards':
-      return <CardsLayout {...props} />;
   }
 }
 

@@ -451,8 +451,11 @@ export class SupabaseApi implements Api {
       .from('snippets').select(`${SNIPPET_COLS},author:profiles(${PROFILE_COLS})`).eq('id', id).single();
     fail(error);
     const row = data as unknown as SnippetRow;
-    const [s] = await this.hydrateSnippets([row]);
-    return { ...s, author: this.toProfile(row.author!) };
+    const [[s], week] = await Promise.all([
+      this.hydrateSnippets([row]),
+      this.sb.from('weeks').select('status').eq('user_id', row.user_id).eq('week_start', row.week_start).maybeSingle(),
+    ]);
+    return { ...s, author: this.toProfile(row.author!), shared: (week.data?.status ?? 'draft') !== 'draft' };
   }
 
   // -------------------------------------------------------------------------

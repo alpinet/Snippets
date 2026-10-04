@@ -131,7 +131,8 @@ export interface Api {
   deleteSnippet(id: string): Promise<void>;
   publishWeek(weekStart: ISODate): Promise<void>;
   backfillWeek(weekStart: ISODate): Promise<void>;
-  getSnippet(id: string): Promise<Snippet & { author: Profile }>;
+  /** `shared` is false while the moment's week is still a private draft. */
+  getSnippet(id: string): Promise<Snippet & { author: Profile; shared: boolean }>;
 
   // Friends' weeks
   friendsWeek(weekStart: ISODate): Promise<FriendWeek[]>;

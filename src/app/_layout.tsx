@@ -13,6 +13,7 @@ import { OnboardingContext } from '../lib/onboarding';
 import { identify, initMonitoring, reportError, wrapRoot } from '../lib/monitoring';
 import { registerForPush, useNotificationRouting } from '../lib/push';
 import { invalidateFriends, keys, queryClient } from '../lib/queries';
+import { OfflineBanner } from '../components/OfflineBanner';
 import { PrimaryButton } from '../components/ui';
 import { colors, type } from '../theme';
 
@@ -27,6 +28,7 @@ function RootLayout() {
           <AuthProvider>
             <StatusBar style="dark" />
             <Gate />
+            <OfflineBanner />
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

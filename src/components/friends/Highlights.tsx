@@ -34,7 +34,7 @@ export function Highlights({ open, notPosted, sunday }: FriendsLayoutProps) {
               onPress={() => openSnippet(s)}
               style={({ pressed }) => [styles.hero, { width: heroW, height: heroW * 0.78 }, pressed && { opacity: 0.9 }]}
             >
-              {cover ? <MediaThumb item={cover} style={StyleSheet.absoluteFill} rounded={18} /> : null}
+              {cover ? <MediaThumb item={cover} style={StyleSheet.absoluteFill} rounded={18} size="full" /> : null}
               <View style={styles.caption}>
                 <View style={styles.captionWho}>
                   <Avatar name={f.friend.displayName} url={f.friend.avatarUrl} size={22} />

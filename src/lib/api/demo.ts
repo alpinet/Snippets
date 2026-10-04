@@ -461,7 +461,8 @@ export class DemoApi implements Api {
     const db = await this.load();
     const s = db.snippets.find((x) => x.id === id);
     if (!s || !this.canView(s.userId, s.weekStart)) throw new Error('This moment isn’t available');
-    return this.delay({ ...this.snippet(s), author: this.profile(s.userId) });
+    const shared = (this.weekRow(s.userId, s.weekStart)?.status ?? 'draft') !== 'draft';
+    return this.delay({ ...this.snippet(s), author: this.profile(s.userId), shared });
   }
 
   // Friends' weeks -------------------------------------------------------------

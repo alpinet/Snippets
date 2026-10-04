@@ -7,6 +7,7 @@ import { toISODate, type ISODate } from './week';
 
 export const MAX_VIDEO_MS = 15_000;
 const MAX_EDGE = 1600; // archive-quality, not a photo backup (§23)
+const THUMB_EDGE = 480; // crisp at ~160pt on 3x screens
 
 export type PickResult = { media: LocalMedia[]; takenOn: ISODate | null };
 
@@ -82,10 +83,12 @@ async function shrinkImage(uri: string, width: number, height: number, edge = MA
 export async function prepareForUpload(m: LocalMedia): Promise<Prepared> {
   if (m.kind === 'image') {
     const img = await shrinkImage(m.uri, m.width, m.height);
-    return { ...img, mimeType: 'image/jpeg', ext: 'jpg', thumb: null };
+    // Small views (strips, calendar, Home) load this instead of the full image: faster, and far less egress.
+    const thumb = await shrinkImage(img.uri, img.width, img.height, THUMB_EDGE);
+    return { ...img, mimeType: 'image/jpeg', ext: 'jpg', thumb };
   }
   const frame = await VideoThumbnails.getThumbnailAsync(m.uri, { time: 0, quality: 0.8 });
-  const thumb = await shrinkImage(frame.uri, frame.width, frame.height, 900);
+  const thumb = await shrinkImage(frame.uri, frame.width, frame.height, THUMB_EDGE);
   const isMov = m.mimeType.includes('quicktime') || m.uri.toLowerCase().endsWith('.mov');
   return {
     uri: m.uri,

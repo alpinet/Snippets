@@ -8,6 +8,7 @@ import { Card, ErrorNote, Loading, PrimaryButton, Screen, ScreenHeader } from '.
 import { api, type Snippet } from '../../lib/api';
 import { openEditor } from '../../lib/nav';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
+import { useOnline } from '../../lib/useOnline';
 import { useTick } from '../../lib/useTick';
 import {
   DAY_SHORT, addDays, currentWeekStart, formatDay, formatWeekRange, isSunday, now, today, untilSunday, weekDays,
@@ -23,6 +24,7 @@ export default function Home() {
   const t = today();
   const sunday = isSunday();
   const week = useMyWeek(wk);
+  const online = useOnline();
 
   const publish = useMutation({
     mutationFn: () => api.publishWeek(wk),
@@ -80,7 +82,7 @@ export default function Home() {
         <PrimaryButton
           title="Share your week"
           onPress={confirmShare}
-          disabled={count === 0}
+          disabled={count === 0 || !online}
           loading={publish.isPending}
           style={{ marginTop: 20 }}
         />

@@ -6,11 +6,14 @@ import type { MediaItem } from '../lib/api';
 import { colors, radius } from '../theme';
 
 /** Still image for any media item (video → poster frame with a quiet play mark). */
-export function MediaThumb({ item, style, rounded = radius.sm, showPlay = true }: {
+export function MediaThumb({ item, style, rounded = radius.sm, showPlay = true, size = 'thumb' }: {
   item: MediaItem; style?: StyleProp<ViewStyle>; rounded?: number; showPlay?: boolean;
+  /** 'thumb' (default) loads the small rendition when there is one; 'full' for large surfaces. */
+  size?: 'thumb' | 'full';
 }) {
-  const uri = item.kind === 'video' ? item.thumbUrl ?? item.url : item.url;
-  const cacheKey = item.kind === 'video' ? `${item.cacheKey}-thumb` : item.cacheKey;
+  const useThumb = !!item.thumbUrl && (item.kind === 'video' || size === 'thumb');
+  const uri = useThumb ? item.thumbUrl! : item.url;
+  const cacheKey = useThumb ? `${item.cacheKey}-thumb` : item.cacheKey;
   return (
     <View style={[{ borderRadius: rounded, overflow: 'hidden', backgroundColor: colors.fill }, style]}>
       {item.kind === 'video' && !item.thumbUrl ? (
@@ -69,21 +72,21 @@ export function Collage({ media, height = 220, onPress }: { media: MediaItem[]; 
   const [a, b, c] = media;
   if (!a) return null;
   let body;
-  if (media.length === 1) body = <MediaThumb item={a} style={{ flex: 1 }} rounded={radius.md - 4} />;
+  if (media.length === 1) body = <MediaThumb item={a} style={{ flex: 1 }} rounded={radius.md - 4} size="full" />;
   else if (media.length === 2) {
     body = (
       <View style={{ flex: 1, flexDirection: 'row', gap }}>
-        <MediaThumb item={a} style={{ flex: 1 }} rounded={radius.md - 4} />
-        <MediaThumb item={b} style={{ flex: 1 }} rounded={radius.md - 4} />
+        <MediaThumb item={a} style={{ flex: 1 }} rounded={radius.md - 4} size="full" />
+        <MediaThumb item={b} style={{ flex: 1 }} rounded={radius.md - 4} size="full" />
       </View>
     );
   } else {
     body = (
       <View style={{ flex: 1, flexDirection: 'row', gap }}>
-        <MediaThumb item={a} style={{ flex: 1.6 }} rounded={radius.md - 4} />
+        <MediaThumb item={a} style={{ flex: 1.6 }} rounded={radius.md - 4} size="full" />
         <View style={{ flex: 1, gap }}>
-          <MediaThumb item={b} style={{ flex: 1 }} rounded={radius.md - 4} />
-          <MediaThumb item={c} style={{ flex: 1 }} rounded={radius.md - 4} />
+          <MediaThumb item={b} style={{ flex: 1 }} rounded={radius.md - 4} size="full" />
+          <MediaThumb item={c} style={{ flex: 1 }} rounded={radius.md - 4} size="full" />
         </View>
       </View>
     );

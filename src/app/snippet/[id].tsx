@@ -81,15 +81,23 @@ export default function SnippetDetail() {
             {s.title ? <Text style={[type.prompt, { fontSize: 22, marginTop: 4 }]}>{s.title}</Text> : null}
             {s.reflection ? <Text style={[type.body, { marginTop: 8, fontSize: 16, lineHeight: 23 }]}>{s.reflection}</Text> : null}
 
-            <View style={{ marginTop: 18 }}>
-              <ReactionBar snippet={s} meId={meId} />
-            </View>
-            <View style={{ marginTop: 16 }}>
-              <CommentList comments={s.comments} meId={meId} ownerId={s.userId} />
-            </View>
-            <View style={{ marginTop: 14 }}>
-              <CommentInput snippetId={s.id} />
-            </View>
+            {s.shared ? (
+              <>
+                <View style={{ marginTop: 18 }}>
+                  <ReactionBar snippet={s} meId={meId} />
+                </View>
+                <View style={{ marginTop: 16 }}>
+                  <CommentList comments={s.comments} meId={meId} ownerId={s.userId} />
+                </View>
+                <View style={{ marginTop: 14 }}>
+                  <CommentInput snippetId={s.id} />
+                </View>
+              </>
+            ) : (
+              <Text style={[type.small, { marginTop: 18, color: colors.ink3 }]}>
+                Only you can see this until you share the week.
+              </Text>
+            )}
             {!isMine ? (
               <View style={{ alignItems: 'center', marginTop: 28 }}>
                 <TextButton
