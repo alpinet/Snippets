@@ -6,7 +6,7 @@
 --   * backfilled weeks never unlock friends' weeks
 --   * mutual friends only
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 create extension if not exists pg_net;
 
 -------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ create table public.profiles (
 create table public.user_private (
   user_id              uuid primary key references public.profiles on delete cascade,
   timezone             text not null default 'UTC',
-  invite_code          text not null unique default encode(gen_random_bytes(6), 'hex'),
+  invite_code          text not null unique default encode(extensions.gen_random_bytes(6), 'hex'),
   notify_sunday        boolean not null default true,
   notify_nudges        boolean not null default true,
   notify_friend_posted boolean not null default true,
@@ -163,7 +163,7 @@ end $$;
 
 create or replace function public.regenerate_invite_code() returns text
 language sql security definer set search_path = public as $$
-  update user_private set invite_code = encode(gen_random_bytes(6), 'hex')
+  update user_private set invite_code = encode(extensions.gen_random_bytes(6), 'hex')
   where user_id = auth.uid() returning invite_code
 $$;
 
