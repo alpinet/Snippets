@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snippets — a few moments from your week</title>
+  <meta name="description" content="A private weekly scrapbook for you and your closest friends." />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <div class="mark">✦</div>
+    <h1>Snippets</h1>
+    <p class="sub">A few moments from your week.</p>
+    <div class="card">
+      <p>Save up to three moments a week — using photos you already took. On Sunday, share them with a few close friends, and their weeks open up for you.</p>
+      <p>No followers, no feed, no likes, no streaks. And in a year, you’ll actually remember your year.</p>
+      <div class="buttons">
+        <a class="btn primary" data-store="ios" href="#">Download on the App Store</a>
+        <a class="btn secondary" data-store="android" href="#">Get it on Google Play</a>
+      </div>
+    </div>
+    <footer><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></footer>
+  </main>
+  <script src="/config.js"></script>
+  <script>
+    document.querySelectorAll('[data-store]').forEach((a) => {
+      a.href = a.dataset.store === 'ios' ? SNIPPETS.appStoreUrl : SNIPPETS.playStoreUrl;
+    });
+  </script>
+</body>
+</html>

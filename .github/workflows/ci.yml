@@ -1,0 +1,43 @@
+# Runs on every push and pull request: app checks + database migrations/tests against a real Postgres.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --ci
+      # Advisory: Expo's patch releases make this fail with no code change. Check the log and run `npx expo install --fix`.
+      - run: npx expo-doctor
+        continue-on-error: true
+
+  database:
+    name: Migrations + RLS tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # Starts Postgres/Auth/Storage in Docker and applies every migration from scratch.
+      - run: supabase db start
+      - run: supabase test db
+      - name: Lint SQL (security definer / RLS warnings)
+        run: supabase db lint --level warning

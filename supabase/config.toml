@@ -1,0 +1,59 @@
+# Local development config for the Supabase CLI (`npx supabase start`).
+project_id = "snippets"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "25MiB"
+
+[auth]
+enabled = true
+site_url = "snippets://"
+additional_redirect_urls = ["snippets://auth-callback", "snippets-beta://auth-callback", "snippets-dev://auth-callback"]
+jwt_expiry = 3600
+enable_signup = true
+
+# Auth abuse limits (per IP / hour). Mirror these in Dashboard → Auth → Rate Limits for hosted projects.
+[auth.rate_limit]
+email_sent = 4
+sign_in_sign_ups = 30
+token_refresh = 150
+token_verifications = 30
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[auth.external.apple]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+
+[edge_runtime]
+enabled = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.health]
+verify_jwt = false
+
+[functions.apple-auth]
+verify_jwt = true

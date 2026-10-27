@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>You’re invited to Snippets</title>
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <div class="mark">✦</div>
+    <h1 id="headline">You’re invited to Snippets</h1>
+    <p class="sub">A private weekly scrapbook for a few close friends.</p>
+    <div class="card">
+      <p>Get the app, then add this invite code when you set up (or just tap this link again once it’s installed):</p>
+      <div class="code" id="code">——</div>
+      <div class="buttons">
+        <a class="btn primary" data-store="ios" href="#">Download on the App Store</a>
+        <a class="btn secondary" data-store="android" href="#">Get it on Google Play</a>
+      </div>
+    </div>
+    <footer><a href="/">What is Snippets?</a> · <a href="/privacy">Privacy</a></footer>
+  </main>
+  <script src="/config.js"></script>
+  <script>
+    // If the app is installed, iOS/Android open it directly via Universal/App Links and this page never shows.
+    const code = (location.pathname.match(/invite\/([a-f0-9]{12})/i) || [])[1]
+      || new URLSearchParams(location.search).get('code');
+    document.querySelectorAll('[data-store]').forEach((a) => {
+      a.href = a.dataset.store === 'ios' ? SNIPPETS.appStoreUrl : SNIPPETS.playStoreUrl;
+    });
+    if (code) {
+      document.getElementById('code').textContent = code.toLowerCase();
+      // Show who invited you (display name only; nothing else is public).
+      fetch(`${SNIPPETS.supabaseUrl}/rest/v1/rpc/invite_preview`, {
+        method: 'POST',
+        headers: { apikey: SNIPPETS.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const name = data && data.display_name;
+          if (name) document.getElementById('headline').textContent = `${name} invited you to Snippets`;
+        })
+        .catch(() => {});
+    }
+  </script>
+</body>
+</html>
