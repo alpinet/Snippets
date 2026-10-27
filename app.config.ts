@@ -1,4 +1,5 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import { withEntitlementsPlist, type ConfigPlugin } from 'expo/config-plugins';
 
 /**
  * Three app variants so dev, staging and production can live side by side on one phone,
@@ -13,6 +14,18 @@ const variant = {
   preview: { name: 'Snippets Beta', id: `${BUNDLE_ID}.beta`, scheme: 'snippets-beta' },
   production: { name: 'Snippets', id: BUNDLE_ID, scheme: 'snippets' },
 }[VARIANT];
+
+// Local device builds on a free Apple ID ("personal team") can't sign Sign in with Apple or
+// Push Notifications. IOS_PERSONAL_TEAM=1 drops both entitlements so `expo run:ios --device`
+// works; Apple sign-in and push won't work in that build. Never set it for EAS builds.
+const PERSONAL_TEAM = process.env.IOS_PERSONAL_TEAM === '1';
+
+const withoutPaidEntitlements: ConfigPlugin = (config) =>
+  withEntitlementsPlist(config, (cfg) => {
+    delete cfg.modResults['aps-environment'];
+    delete cfg.modResults['com.apple.developer.applesignin'];
+    return cfg;
+  });
 
 // Universal Links / App Links: https://<site>/invite/<code> opens the app when installed.
 // Only production claims the real domain; set EXPO_PUBLIC_SITE_URL for each EAS environment.
@@ -171,7 +184,7 @@ const base: ExpoConfig = {
   }
 };
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+const withVariant = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   ...base,
   name: variant.name,
@@ -179,6 +192,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     ...base.ios,
     bundleIdentifier: variant.id,
+    ...(PERSONAL_TEAM ? { usesAppleSignIn: false } : null),
     ...(SITE_HOST ? { associatedDomains: [`applinks:${SITE_HOST}`] } : null),
   },
   android: {
@@ -206,3 +220,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   extra: { ...base.extra, appVariant: VARIANT },
 });
+
+// Applied before the `plugins` list, so its entitlements mod runs after theirs and has the last word.
+export default (ctx: ConfigContext): ExpoConfig =>
+  PERSONAL_TEAM ? withoutPaidEntitlements(withVariant(ctx)) : withVariant(ctx);
