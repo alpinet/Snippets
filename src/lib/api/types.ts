@@ -37,6 +37,9 @@ export type Comment = {
   createdAt: string;
 };
 
+/** Every moment is explicitly kept for yourself or shared with friends. There is no default. */
+export type Visibility = 'private' | 'friends';
+
 export type Snippet = {
   id: string;
   userId: string;
@@ -44,6 +47,7 @@ export type Snippet = {
   happenedOn: ISODate;
   title: string;
   reflection: string;
+  visibility: Visibility;
   media: MediaItem[];
   reactions: Reaction[];
   comments: Comment[];
@@ -98,6 +102,7 @@ export type SnippetInput = {
   happenedOn: ISODate;
   title: string;
   reflection: string;
+  visibility: Visibility;
   media: DraftMedia[];
 };
 
@@ -132,7 +137,7 @@ export interface Api {
   deleteSnippet(id: string): Promise<void>;
   publishWeek(weekStart: ISODate): Promise<void>;
   backfillWeek(weekStart: ISODate): Promise<void>;
-  /** `shared` is false while the moment's week is still a private draft. */
+  /** `shared`: friends can see it (marked for friends, and the week has been kept). */
   getSnippet(id: string): Promise<Snippet & { author: Profile; shared: boolean }>;
 
   // Friends' weeks
@@ -163,6 +168,6 @@ export interface Api {
 
 export type AnalyticsEvent =
   | 'app_open' | 'friends_viewed' | 'invite_sent' | 'invite_accepted'
-  | 'recap_shared' | 'archive_exported' | 'moment_saved' | 'week_shared';
+  | 'recap_shared' | 'archive_exported' | 'moment_saved' | 'week_shared' | 'week_kept';
 
 export type ReportTarget = { userId: string; snippetId?: string; commentId?: string };

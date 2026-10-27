@@ -21,6 +21,8 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 };
 export const gutter = 20;
 
 const family = Platform.select({ ios: 'System', default: undefined });
+// Your own words read like a journal: iOS's New York serif, the platform serif elsewhere.
+const serif = Platform.select({ ios: 'ui-serif', default: 'serif' });
 
 export const type = {
   title: { fontFamily: family, fontSize: 28, fontWeight: '500', color: colors.ink, letterSpacing: -0.3 },
@@ -31,6 +33,7 @@ export const type = {
   secondary: { fontFamily: family, fontSize: 15, fontWeight: '400', color: colors.ink2, lineHeight: 20 },
   small: { fontFamily: family, fontSize: 13, fontWeight: '400', color: colors.ink2 },
   label: { fontFamily: family, fontSize: 13, fontWeight: '500', color: colors.ink2, letterSpacing: 0.1 },
+  reflection: { fontFamily: serif, fontSize: 17, fontWeight: '400', color: colors.ink, lineHeight: 25 },
 } satisfies Record<string, TextStyle>;
 
 export const cardStyle: ViewStyle = {

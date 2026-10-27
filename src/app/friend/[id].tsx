@@ -46,7 +46,7 @@ export default function FriendHistory() {
         {history.isLoading ? (
           <Loading />
         ) : !history.data?.length ? (
-          <EmptyState title="Nothing here yet" body="Weeks you both share will collect here." />
+          <EmptyState title="Nothing here yet" body="Moments they share in weeks you both keep will collect here." />
         ) : (
           history.data.map((w) => {
             const mk = monthKey(w.weekStart);

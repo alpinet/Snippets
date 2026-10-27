@@ -40,9 +40,9 @@ reset role;
 insert into weeks (user_id, week_start, status) values
   ('00000000-0000-0000-0000-0000000000a1', date_trunc('week', now())::date - 7, 'published'),
   ('00000000-0000-0000-0000-0000000000b1', date_trunc('week', now())::date - 7, 'published');
-insert into snippets (id, user_id, week_start, happened_on, title) values
+insert into snippets (id, user_id, week_start, happened_on, title, visibility) values
   ('00000000-0000-0000-0000-00000000c0de', '00000000-0000-0000-0000-0000000000a1',
-   date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 7, 'ramen');
+   date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 7, 'ramen', 'friends');
 select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
 set local role authenticated;
 insert into comments (snippet_id, body) values ('00000000-0000-0000-0000-00000000c0de', 'looks great');

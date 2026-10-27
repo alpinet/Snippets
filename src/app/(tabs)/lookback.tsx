@@ -138,7 +138,7 @@ function TimelineEntry({ entry, meId, onShuffle }: { entry: Entry; meId: string;
     case 'week':
       return (
         <Row>
-          <WeekCard week={entry.week} meId={meId} />
+          <WeekCard week={entry.week} />
         </Row>
       );
     case 'missed':
@@ -159,7 +159,7 @@ function TimelineEntry({ entry, meId, onShuffle }: { entry: Entry; meId: string;
         <Row>
           <View style={{ gap: 8, flex: 1 }}>
             <Badge label="Around this time last month" />
-            <WeekCard week={entry.week} meId={meId} showTitle={false} />
+            <WeekCard week={entry.week} showTitle={false} />
           </View>
         </Row>
       );
@@ -192,11 +192,12 @@ function TimelineEntry({ entry, meId, onShuffle }: { entry: Entry; meId: string;
   }
 }
 
-function WeekCard({ week, meId, showTitle = true }: { week: Week; meId: string; showTitle?: boolean }) {
+function WeekCard({ week, showTitle = true }: { week: Week; showTitle?: boolean }) {
   const backfill = useMutation({ mutationFn: () => api.backfillWeek(week.weekStart), onSuccess: invalidateSnippets });
   const covers = week.snippets.map((s) => s.media[0]).filter(Boolean).slice(0, 3);
   const n = week.snippets.length;
-  const replies = week.snippets.reduce((a, s) => a + s.comments.filter((c) => c.author.id !== meId).length, 0);
+  // Your archive counts your moments, never other people's replies.
+  const justForMe = week.snippets.filter((s) => s.visibility === 'private').length;
   const unshared = week.status === 'draft';
 
   return (
@@ -213,10 +214,10 @@ function WeekCard({ week, meId, showTitle = true }: { week: Week; meId: string; 
       <View style={styles.meta}>
         <Text style={type.small}>
           {n} {n === 1 ? 'moment' : 'moments'}
-          {unshared ? ' · not saved yet' : ` · ${replies} ${replies === 1 ? 'reply' : 'replies'}`}
+          {unshared ? ' · not kept yet' : justForMe ? ` · ${justForMe === n ? 'all' : justForMe} just for you` : ''}
         </Text>
         {unshared ? (
-          <TextButton title="Save to archive" onPress={() => backfill.mutate()} disabled={backfill.isPending} style={{ fontSize: 14 }} />
+          <TextButton title="Keep this week" onPress={() => backfill.mutate()} disabled={backfill.isPending} style={{ fontSize: 14 }} />
         ) : null}
       </View>
     </Card>

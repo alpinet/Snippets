@@ -21,8 +21,8 @@ export default function MyWeek() {
   const n = w?.snippets.length ?? 0;
   const isPast = weekStart < currentWeekStart();
   const status =
-    w?.status === 'published' ? 'Shared with friends on Sunday'
-      : w?.status === 'backfilled' ? 'Saved to your archive'
+    w?.status === 'published' ? 'Kept on Sunday'
+      : w?.status === 'backfilled' ? 'Kept in your Lookback'
         : n ? 'Not saved yet — only you can see this' : 'Nothing saved for this week yet';
 
   return (
@@ -53,7 +53,7 @@ export default function MyWeek() {
             <Text style={[type.secondary, { marginBottom: 16 }]}>{status}</Text>
             <View style={{ gap: 16 }}>
               {w!.snippets.map((s) => (
-                <SnippetCard key={s.id} snippet={s} meId={me.data?.id ?? ''} commentLimit={3} social={w!.status !== 'draft'} />
+                <SnippetCard key={s.id} snippet={s} meId={me.data?.id ?? ''} commentLimit={3} social={w!.status !== 'draft' && s.visibility === 'friends'} />
               ))}
             </View>
             {n < 3 ? (
@@ -65,7 +65,7 @@ export default function MyWeek() {
             {isPast && w!.status === 'draft' && n ? (
               <>
                 <PrimaryButton
-                  title="Save to archive"
+                  title="Keep this week"
                   onPress={() => backfill.mutate()}
                   loading={backfill.isPending}
                   style={{ marginTop: 24 }}

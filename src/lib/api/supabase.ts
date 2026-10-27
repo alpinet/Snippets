@@ -13,7 +13,7 @@ import { prepareForUpload } from '../media';
 import type { ISODate } from '../week';
 import type {
   Api, Comment, FriendRequest, FriendWeek, LocalMedia, MediaItem, Profile, ReactionKind,
-  AnalyticsEvent, ReportTarget, Session, Settings, Snippet, SnippetInput, Week, WeekStatus,
+  AnalyticsEvent, ReportTarget, Session, Settings, Snippet, SnippetInput, Visibility, Week, WeekStatus,
 } from './types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -30,13 +30,13 @@ type MediaRow = {
 type CommentRow = { id: string; snippet_id: string; body: string; created_at: string; author: ProfileRow };
 type SnippetRow = {
   id: string; user_id: string; week_start: string; happened_on: string; title: string;
-  reflection: string; position: number; created_at: string;
+  reflection: string; visibility: Visibility; position: number; created_at: string;
   media: MediaRow[]; reactions: { user_id: string; kind: ReactionKind }[]; comments: CommentRow[];
   author?: ProfileRow;
 };
 
 const PROFILE_COLS = 'id,username,display_name,avatar_path';
-const SNIPPET_COLS = `id,user_id,week_start,happened_on,title,reflection,position,created_at,
+const SNIPPET_COLS = `id,user_id,week_start,happened_on,title,reflection,visibility,position,created_at,
   media(id,kind,path,thumb_path,width,height,duration_ms,position),
   reactions(user_id,kind),
   comments(id,snippet_id,body,created_at,author:profiles(${PROFILE_COLS}))`;
@@ -127,6 +127,7 @@ export class SupabaseApi implements Api {
         happenedOn: s.happened_on,
         title: s.title,
         reflection: s.reflection,
+        visibility: s.visibility,
         createdAt: s.created_at,
         media: [...s.media].sort((a, b) => a.position - b.position).map((m): MediaItem => ({
           id: m.id,
@@ -374,6 +375,7 @@ export class SupabaseApi implements Api {
       happened_on: input.happenedOn,
       title: input.title.trim(),
       reflection: input.reflection.trim(),
+      visibility: input.visibility,
     };
 
     if (isNew) {
@@ -464,7 +466,8 @@ export class SupabaseApi implements Api {
       this.hydrateSnippets([row]),
       this.sb.from('weeks').select('status').eq('user_id', row.user_id).eq('week_start', row.week_start).maybeSingle(),
     ]);
-    return { ...s, author: this.toProfile(row.author!), shared: (week.data?.status ?? 'draft') !== 'draft' };
+    const kept = (week.data?.status ?? 'draft') !== 'draft';
+    return { ...s, author: this.toProfile(row.author!), shared: kept && s.visibility === 'friends' };
   }
 
   // -------------------------------------------------------------------------

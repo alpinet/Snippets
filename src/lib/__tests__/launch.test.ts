@@ -1,5 +1,4 @@
 import { DemoApi } from '../api/demo';
-import type { LocalMedia } from '../api/types';
 import { parseInviteCode } from '../invite';
 import { addDays, currentWeekStart, setClockOffset } from '../week';
 
@@ -10,10 +9,6 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('../api/supabase', () => ({}));
 jest.mock('../api', () => ({ api: { track: jest.fn(() => Promise.resolve()), acceptInvite: jest.fn() } }));
 jest.mock('../queries', () => ({ invalidateFriends: jest.fn() }));
-
-const photo = (): LocalMedia => ({
-  local: true, uri: 'file:///x.jpg', kind: 'image', width: 100, height: 100, durationMs: null, mimeType: 'image/jpeg',
-});
 
 let api: DemoApi;
 beforeEach(async () => {
@@ -41,11 +36,17 @@ test('analytics events carry names and counts only', async () => {
   expect(Object.keys(events[0].props).sort()).toEqual(['backfill', 'media']);
 });
 
-test('unshared moments are marked private in detail', async () => {
-  const s = await api.saveSnippet({
-    weekStart: currentWeekStart(), happenedOn: currentWeekStart(), title: 'draft', reflection: '', media: [photo()],
-  });
-  expect((await api.getSnippet(s.id)).shared).toBe(false);
+test('a moment is only "shared" once marked for friends and its week is kept', async () => {
+  const wk = currentWeekStart();
+  // The seeded week holds one shared and one private moment.
+  const seeded = (await api.myWeek(wk)).snippets;
+  const s = seeded.find((x) => x.visibility === 'friends')!;
+  const p = seeded.find((x) => x.visibility === 'private')!;
+  expect((await api.getSnippet(s.id)).shared).toBe(false); // week not kept yet
+  setClockOffset(4 * 86_400_000); // Sunday
+  await api.publishWeek(wk);
+  expect((await api.getSnippet(s.id)).shared).toBe(true);
+  expect((await api.getSnippet(p.id)).shared).toBe(false);
 });
 
 test('keeping last week’s unshared drafts archives them without unlocking friends', async () => {

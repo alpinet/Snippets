@@ -37,8 +37,9 @@ For database rule tests: `npx supabase start`, then `npx supabase test db`. This
 | Rule | Server (source of truth) | Client |
 |---|---|---|
 | 3 moments/week, 1–3 media each, video ≤ 15s | triggers in `supabase/migrations/*_init.sql` | editor + picker limits |
-| Publish only on Sunday, local timezone | `publish_week()` checks `user_private.timezone` | Home shows Share only on Sunday |
-| Post-to-unlock | `can_view_week()` used by every RLS policy + storage reads | Friends tab lock states |
+| Every moment is "Just for me" or "Share with friends", no default | `snippets.visibility` (not null, no default); `can_view_snippet()` hides private moments from everyone else | Editor requires a choice before saving |
+| Keep your week only on Sunday, local timezone | `publish_week()` checks `user_private.timezone` | Home shows "Keep your week" only on Sunday |
+| Keep-to-unlock: keeping your week (private or shared) opens friends' *shared* moments | `can_view_week()` + `can_view_snippet()`, used by every RLS policy and storage read | Friends tab lock states |
 | Backfill never unlocks friends | `can_view_week()` requires the viewer's week be `published`, not `backfilled` | — |
 | One nudge per friend per week | `nudges` primary key + `nudge()` | "Nudged" state |
 | Mutual friends only | `friendships` + RPCs | Friends manager, invite links |

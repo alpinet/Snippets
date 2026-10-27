@@ -127,7 +127,7 @@ export function CommentInput({ snippetId }: { snippetId: string }) {
 /** One snippet, spotlighted: date, collage, title, reflection, reactions, comments. */
 export function SnippetCard({ snippet, meId, width, commentLimit = 2, social = true }: {
   snippet: Snippet; meId: string; width?: number; commentLimit?: number;
-  /** false for private drafts: no reactions or comments yet. */
+  /** false for moments friends can't see (private, or the week isn't kept): no reactions or comments. */
   social?: boolean;
 }) {
   const open = () => router.push({ pathname: '/snippet/[id]', params: { id: snippet.id } });
@@ -138,7 +138,9 @@ export function SnippetCard({ snippet, meId, width, commentLimit = 2, social = t
       <Pressable onPress={open}>
         {snippet.title ? <Text style={[type.cardTitle, { fontSize: 19, marginTop: 4 }]}>{snippet.title}</Text> : null}
         {snippet.reflection ? (
-          <Text style={[type.secondary, { marginTop: 4, color: '#6E655E' }]} numberOfLines={4}>{snippet.reflection}</Text>
+          <Text style={[type.reflection, { fontSize: 16, lineHeight: 23, marginTop: 4, color: '#6E655E' }]} numberOfLines={4}>
+            {snippet.reflection}
+          </Text>
         ) : null}
       </Pressable>
       {social ? (

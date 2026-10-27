@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ImagePlus, Shuffle } from 'lucide-react-native';
+import { ImagePlus, Lock, Shuffle, Users } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MediaThumb } from '../../components/media';
 import { TextButton } from '../../components/ui';
-import { api, type DraftMedia, type MediaItem } from '../../lib/api';
+import { api, type DraftMedia, type MediaItem, type Visibility } from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { pickMedia } from '../../lib/media';
 import { useOnline } from '../../lib/useOnline';
@@ -19,13 +19,19 @@ import {
 } from '../../lib/week';
 import { colors, gutter, iconStroke, radius, type } from '../../theme';
 
-// §7 — reflection, not a caption.
+// Reflection, not a caption: questions you'd ask yourself, never "what would you tell people".
 const PROMPTS = [
-  'Why was this memorable?',
-  'What made this stand out?',
-  'What’s the story behind this?',
+  'Why did this matter to you?',
   'What do you want to remember about this?',
-  'What would you tell a friend about this?',
+  'What did you appreciate about it?',
+  'What was new for you here?',
+  'What did it take to get here?',
+  'What would future you want to know about this?',
+];
+
+const AUDIENCES: { value: Visibility; title: string; detail: string; Icon: typeof Lock }[] = [
+  { value: 'private', title: 'Just for me', detail: 'Only you will ever see it.', Icon: Lock },
+  { value: 'friends', title: 'Share with friends', detail: 'Friends see it after they keep their week.', Icon: Users },
 ];
 
 const MAX_MEDIA = 3;
@@ -53,6 +59,8 @@ export default function EditSnippet() {
   const [happenedOn, setHappenedOn] = useState<ISODate>(defaultDay);
   const [title, setTitle] = useState('');
   const [reflection, setReflection] = useState('');
+  // Deliberately no default: every moment is a choice between keeping it and sharing it.
+  const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [promptIdx, setPromptIdx] = useState(() => Math.floor(Math.random() * PROMPTS.length));
   const [progress, setProgress] = useState<number | null>(null);
   const hydrated = useRef(false);
@@ -65,6 +73,7 @@ export default function EditSnippet() {
     setHappenedOn(existing.happenedOn);
     setTitle(existing.title);
     setReflection(existing.reflection);
+    setVisibility(existing.visibility);
   }, [existing]);
 
   // New moment: go straight to the camera roll (step 1).
@@ -126,7 +135,7 @@ export default function EditSnippet() {
   const save = useMutation({
     mutationFn: async () => {
       const saved = await api.saveSnippet(
-        { id: params.id, weekStart, happenedOn, title, reflection, media },
+        { id: params.id, weekStart, happenedOn, title, reflection, visibility: visibility!, media },
         (f) => setProgress(f),
       );
       // Backfilling a past week puts it straight into the archive — no separate "save" step.
@@ -137,7 +146,7 @@ export default function EditSnippet() {
     },
     onSuccess: async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      track('moment_saved', { media: media.length, backfill: isPastWeek, edit: isEdit });
+      track('moment_saved', { media: media.length, backfill: isPastWeek, edit: isEdit, shared: visibility === 'friends' });
       await invalidateSnippets();
       router.back();
     },
@@ -168,7 +177,8 @@ export default function EditSnippet() {
 
   const days = useMemo(() => weekDays(weekStart), [weekStart]);
   const online = useOnline();
-  const canSave = media.length > 0 && !save.isPending && online;
+  const canSave = media.length > 0 && visibility !== null && !save.isPending && online;
+  const kept = week.data?.status === 'published' || week.data?.status === 'backfilled';
   const saveLabel = save.isPending
     ? progress !== null && progress < 1 ? `Saving ${Math.round(progress * 100)}%` : 'Saving…'
     : 'Save';
@@ -258,20 +268,50 @@ export default function EditSnippet() {
             dirty.current = true;
             setReflection(v);
           }}
-          placeholder="Optional — a line or two is plenty."
+          placeholder="Write it for yourself. A line or two is plenty."
           placeholderTextColor={colors.ink3}
-          style={[styles.input, styles.multiline]}
+          style={[styles.input, styles.multiline, type.reflection]}
           multiline
           maxLength={1000}
           textAlignVertical="top"
         />
 
+        <Text style={[type.label, styles.label]}>Who is this for?</Text>
+        <View style={{ gap: 10 }} accessibilityRole="radiogroup">
+          {AUDIENCES.map(({ value, title: label, detail, Icon }) => {
+            const selected = visibility === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => {
+                  dirty.current = true;
+                  setVisibility(value);
+                }}
+                style={({ pressed }) => [styles.audience, selected && styles.audienceSelected, pressed && { opacity: 0.8 }]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Icon size={20} color={selected ? colors.accent : colors.ink2} strokeWidth={iconStroke} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { fontWeight: '500' }]}>{label}</Text>
+                  <Text style={[type.small, { marginTop: 2 }]}>{detail}</Text>
+                </View>
+                <View style={[styles.radio, selected && styles.radioOn]} />
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Text style={[type.small, { marginTop: 14, color: colors.ink3 }]}>
-          {week.data?.status === 'published' || week.data?.status === 'backfilled'
-            ? 'This week is already shared. Changes show up for friends right away.'
-            : isPastWeek
-              ? 'Goes straight into your archive. Backfilling never opens friends’ past weeks.'
-              : 'Saved privately. Share it with your week on Sunday.'}
+          {media.length > 0 && visibility === null
+            ? 'Choose who it’s for to save it.'
+            : kept && visibility === 'friends'
+              ? 'This week is kept, so friends can already see this. Changes show up right away.'
+              : isPastWeek
+                ? 'Goes straight into your archive. Adding past weeks never opens friends’ past weeks.'
+                : visibility === 'private'
+                  ? 'Only you will see this, now and in your Lookback.'
+                  : 'Keep your week on Sunday to look back on it.'}
         </Text>
 
         {isEdit ? (
@@ -332,4 +372,17 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 120, lineHeight: 22 },
   promptRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  audience: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+    borderRadius: radius.md - 2,
+    backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  audienceSelected: { borderColor: colors.accent, borderWidth: 1.25, backgroundColor: colors.accentSoft },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: colors.ink3 },
+  radioOn: { borderColor: colors.accent, borderWidth: 6 },
 });

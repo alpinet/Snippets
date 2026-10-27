@@ -79,11 +79,12 @@ export default function SnippetDetail() {
             ) : null}
             <Text style={type.small}>{formatDay(s.happenedOn)}</Text>
             {s.title ? <Text style={[type.prompt, { fontSize: 22, marginTop: 4 }]}>{s.title}</Text> : null}
-            {s.reflection ? <Text style={[type.body, { marginTop: 8, fontSize: 16, lineHeight: 23 }]}>{s.reflection}</Text> : null}
+            {s.reflection ? <Text style={[type.reflection, { marginTop: 10 }]}>{s.reflection}</Text> : null}
 
             {s.shared ? (
               <>
-                <View style={{ marginTop: 18 }}>
+                <Text style={[type.label, { marginTop: 26 }]}>From friends</Text>
+                <View style={{ marginTop: 10 }}>
                   <ReactionBar snippet={s} meId={meId} />
                 </View>
                 <View style={{ marginTop: 16 }}>
@@ -95,7 +96,9 @@ export default function SnippetDetail() {
               </>
             ) : (
               <Text style={[type.small, { marginTop: 18, color: colors.ink3 }]}>
-                Only you can see this until you share the week.
+                {s.visibility === 'private'
+                  ? 'Just for you. Only you will ever see this.'
+                  : 'Friends will see this once you keep your week on Sunday.'}
               </Text>
             )}
             {!isMine ? (

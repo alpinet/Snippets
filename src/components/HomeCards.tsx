@@ -41,11 +41,13 @@ export function LastWeekCard({ weekStart }: { weekStart: ISODate }) {
       <Archive size={20} color={colors.accent} strokeWidth={iconStroke} />
       <View style={{ flex: 1 }}>
         <Text style={[type.body, { fontWeight: '500' }]}>
-          Last week’s {n === 1 ? 'moment wasn’t' : `${n} moments weren’t`} shared.
+          Last week isn’t kept yet.
         </Text>
-        <Text style={[type.small, { marginTop: 2 }]}>Keep {n === 1 ? 'it' : 'them'} in your archive for {formatWeekRange(lastWeek)}?</Text>
+        <Text style={[type.small, { marginTop: 2 }]}>
+          Keep {n === 1 ? 'its moment' : `its ${n} moments`} in your Lookback for {formatWeekRange(lastWeek)}?
+        </Text>
         <View style={{ flexDirection: 'row', marginTop: 8 }}>
-          <TextButton title={keep.isPending ? 'Keeping…' : 'Keep them'} onPress={() => keep.mutate()} disabled={keep.isPending} />
+          <TextButton title={keep.isPending ? 'Keeping…' : 'Keep it'} onPress={() => keep.mutate()} disabled={keep.isPending} />
         </View>
       </View>
       <Pressable onPress={dismiss} hitSlop={10} accessibilityLabel="Dismiss">
@@ -55,7 +57,7 @@ export function LastWeekCard({ weekStart }: { weekStart: ISODate }) {
   );
 }
 
-/** A brand-new account: nothing saved, no friends. Point gently at the two things that matter. */
+/** A brand-new account: start with one moment of your own; friends are optional and come second. */
 export function GettingStartedCard({ weekStart, momentsThisWeek }: { weekStart: ISODate; momentsThisWeek: number }) {
   const archive = useArchive();
   const friends = useFriends();
@@ -68,13 +70,13 @@ export function GettingStartedCard({ weekStart, momentsThisWeek }: { weekStart: 
   return (
     <View style={[cardStyle, styles.card, { alignItems: 'flex-start' }]}>
       <View style={{ flex: 1, gap: 8 }}>
-        <Text style={[type.body, { fontWeight: '500' }]}>Two small things to start</Text>
+        <Text style={[type.body, { fontWeight: '500' }]}>{isNew ? 'Start with one moment' : 'When you’re ready'}</Text>
         {isNew ? (
-          <Step label="Add a moment from this week" onPress={() => openEditor({ weekStart })} />
+          <Step label="What’s one thing from this week you want to keep?" onPress={() => openEditor({ weekStart })} />
         ) : null}
         {noFriends ? (
           <Step
-            label="Invite a friend to swap weeks with"
+            label="Optional: share weeks with a close friend"
             onPress={() => settings.data && shareInvite(settings.data.inviteCode)}
           />
         ) : null}
