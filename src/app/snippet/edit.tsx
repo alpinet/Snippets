@@ -9,7 +9,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MediaThumb } from '../../components/media';
 import { TextButton } from '../../components/ui';
-import { api, type DraftMedia, type MediaItem, type Visibility } from '../../lib/api';
+import {
+  MOMENT_KINDS, api, type DraftMedia, type MediaItem, type MomentKind, type Visibility,
+} from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { pickMedia } from '../../lib/media';
 import { useOnline } from '../../lib/useOnline';
@@ -61,7 +63,10 @@ export default function EditSnippet() {
   const [reflection, setReflection] = useState('');
   // Deliberately no default: every moment is a choice between keeping it and sharing it.
   const [visibility, setVisibility] = useState<Visibility | null>(null);
+  // Optional. Choosing a kind asks that kind's question; the shuffle still cycles the general ones.
+  const [kind, setKind] = useState<MomentKind | null>(null);
   const [promptIdx, setPromptIdx] = useState(() => Math.floor(Math.random() * PROMPTS.length));
+  const [kindPrompt, setKindPrompt] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const hydrated = useRef(false);
   const dirty = useRef(false);
@@ -74,7 +79,16 @@ export default function EditSnippet() {
     setTitle(existing.title);
     setReflection(existing.reflection);
     setVisibility(existing.visibility);
+    setKind(existing.kind);
   }, [existing]);
+
+  function chooseKind(next: MomentKind) {
+    dirty.current = true;
+    const k = kind === next ? null : next;
+    setKind(k);
+    // Only steer the question while nothing is written yet; never pull it out from under someone mid-thought.
+    if (!reflection.trim()) setKindPrompt(k ? MOMENT_KINDS.find((m) => m.kind === k)!.prompt : null);
+  }
 
   // New moment: go straight to the camera roll (step 1).
   // Wait for the modal to finish presenting; iOS drops a picker presented mid-transition.
@@ -135,7 +149,7 @@ export default function EditSnippet() {
   const save = useMutation({
     mutationFn: async () => {
       const saved = await api.saveSnippet(
-        { id: params.id, weekStart, happenedOn, title, reflection, visibility: visibility!, media },
+        { id: params.id, weekStart, happenedOn, title, reflection, visibility: visibility!, kind, media },
         (f) => setProgress(f),
       );
       // Backfilling a past week puts it straight into the archive — no separate "save" step.
@@ -252,11 +266,32 @@ export default function EditSnippet() {
           returnKeyType="next"
         />
 
+        <Text style={[type.label, styles.label]}>What kind of moment? <Text style={{ color: colors.ink3, fontWeight: '400' }}>Optional</Text></Text>
+        <View style={styles.kinds}>
+          {MOMENT_KINDS.map((k) => {
+            const selected = kind === k.kind;
+            return (
+              <Pressable
+                key={k.kind}
+                onPress={() => chooseKind(k.kind)}
+                style={({ pressed }) => [styles.kind, selected && styles.kindSelected, pressed && { opacity: 0.8 }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.kindText, selected && { color: colors.accent }]}>{k.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={[styles.promptRow, styles.label]}>
-          <Text style={[type.prompt, { flex: 1, fontSize: 17 }]}>{PROMPTS[promptIdx]}</Text>
+          <Text style={[type.prompt, { flex: 1, fontSize: 17 }]}>{kindPrompt ?? PROMPTS[promptIdx]}</Text>
           <Pressable
             hitSlop={10}
-            onPress={() => setPromptIdx((i) => (i + 1) % PROMPTS.length)}
+            onPress={() => {
+              if (kindPrompt) setKindPrompt(null);
+              else setPromptIdx((i) => (i + 1) % PROMPTS.length);
+            }}
             accessibilityLabel="Ask a different question"
           >
             <Shuffle size={18} color={colors.ink2} strokeWidth={iconStroke} />
@@ -372,6 +407,17 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 120, lineHeight: 22 },
   promptRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  kind: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  kindSelected: { borderColor: colors.accent, borderWidth: 1.25, backgroundColor: colors.accentSoft },
+  kindText: { fontSize: 14, color: colors.ink2 },
   audience: {
     flexDirection: 'row',
     alignItems: 'center',

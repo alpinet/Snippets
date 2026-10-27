@@ -51,6 +51,9 @@ export default function MyWeek() {
         ) : (
           <>
             <Text style={[type.secondary, { marginBottom: 16 }]}>{status}</Text>
+            {w!.line ? (
+              <Text style={[type.reflection, { marginTop: -6, marginBottom: 18 }]}>“{w!.line}”</Text>
+            ) : null}
             <View style={{ gap: 16 }}>
               {w!.snippets.map((s) => (
                 <SnippetCard key={s.id} snippet={s} meId={me.data?.id ?? ''} commentLimit={3} social={w!.status !== 'draft' && s.visibility === 'friends'} />

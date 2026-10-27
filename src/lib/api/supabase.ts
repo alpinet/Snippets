@@ -10,10 +10,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { appScheme } from '../config';
 import { prepareForUpload } from '../media';
-import type { ISODate } from '../week';
+import { today, type ISODate } from '../week';
 import type {
-  Api, Comment, FriendRequest, FriendWeek, LocalMedia, MediaItem, Profile, ReactionKind,
-  AnalyticsEvent, ReportTarget, Session, Settings, Snippet, SnippetInput, Visibility, Week, WeekStatus,
+  Api, Comment, FriendRequest, FriendWeek, LocalMedia, LookbackNote, MediaItem, MomentKind, MonthPicks, Profile,
+  ReactionKind, AnalyticsEvent, ReportTarget, Session, Settings, Snippet, SnippetInput, Visibility, Week, WeekStatus,
 } from './types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -28,18 +28,23 @@ type MediaRow = {
   width: number; height: number; duration_ms: number | null; position: number;
 };
 type CommentRow = { id: string; snippet_id: string; body: string; created_at: string; author: ProfileRow };
+type NoteRow = { id: string; snippet_id: string; body: string; written_on: string; created_at: string };
 type SnippetRow = {
   id: string; user_id: string; week_start: string; happened_on: string; title: string;
-  reflection: string; visibility: Visibility; position: number; created_at: string;
+  reflection: string; visibility: Visibility; kind: MomentKind | null; position: number; created_at: string;
   media: MediaRow[]; reactions: { user_id: string; kind: ReactionKind }[]; comments: CommentRow[];
+  lookback_notes: NoteRow[];
   author?: ProfileRow;
 };
 
 const PROFILE_COLS = 'id,username,display_name,avatar_path';
-const SNIPPET_COLS = `id,user_id,week_start,happened_on,title,reflection,visibility,position,created_at,
+const NOTE_COLS = 'id,snippet_id,body,written_on,created_at';
+// lookback_notes are owner-only under RLS, so other people's moments always come back with none.
+const SNIPPET_COLS = `id,user_id,week_start,happened_on,title,reflection,visibility,kind,position,created_at,
   media(id,kind,path,thumb_path,width,height,duration_ms,position),
   reactions(user_id,kind),
-  comments(id,snippet_id,body,created_at,author:profiles(${PROFILE_COLS}))`;
+  comments(id,snippet_id,body,created_at,author:profiles(${PROFILE_COLS})),
+  lookback_notes(${NOTE_COLS})`;
 
 const SIGNED_URL_TTL = 60 * 60 * 6;
 
@@ -128,6 +133,10 @@ export class SupabaseApi implements Api {
         title: s.title,
         reflection: s.reflection,
         visibility: s.visibility,
+        kind: s.kind ?? null,
+        notes: [...(s.lookback_notes ?? [])]
+          .sort((a, b) => a.created_at.localeCompare(b.created_at))
+          .map((n) => this.toNote(n)),
         createdAt: s.created_at,
         media: [...s.media].sort((a, b) => a.position - b.position).map((m): MediaItem => ({
           id: m.id,
@@ -145,6 +154,10 @@ export class SupabaseApi implements Api {
           .map((c) => this.toComment(c)),
       }))
       .sort((a, b) => a.happenedOn.localeCompare(b.happenedOn) || a.createdAt.localeCompare(b.createdAt));
+  }
+
+  private toNote(n: NoteRow): LookbackNote {
+    return { id: n.id, snippetId: n.snippet_id, body: n.body, writtenOn: n.written_on, createdAt: n.created_at };
   }
 
   private toComment(c: CommentRow): Comment {
@@ -333,34 +346,41 @@ export class SupabaseApi implements Api {
 
   async myWeek(weekStart: ISODate): Promise<Week> {
     const uid = await this.uid();
-    const [w, s] = await Promise.all([
+    const [w, s, l] = await Promise.all([
       this.sb.from('weeks').select('status,published_at').eq('user_id', uid).eq('week_start', weekStart).maybeSingle(),
       this.sb.from('snippets').select(SNIPPET_COLS).eq('user_id', uid).eq('week_start', weekStart),
+      this.sb.from('week_lines').select('line').eq('user_id', uid).eq('week_start', weekStart).maybeSingle(),
     ]);
     fail(w.error);
     fail(s.error);
+    fail(l.error);
     return {
       weekStart,
       status: (w.data?.status as WeekStatus) ?? 'draft',
       publishedAt: w.data?.published_at ?? null,
+      line: l.data?.line ?? null,
       snippets: await this.hydrateSnippets((s.data ?? []) as unknown as SnippetRow[]),
     };
   }
 
   async myArchive(): Promise<Week[]> {
     const uid = await this.uid();
-    const [w, s] = await Promise.all([
+    const [w, s, l] = await Promise.all([
       this.sb.from('weeks').select('week_start,status,published_at').eq('user_id', uid),
       this.sb.from('snippets').select(SNIPPET_COLS).eq('user_id', uid),
+      this.sb.from('week_lines').select('week_start,line').eq('user_id', uid),
     ]);
     fail(w.error);
     fail(s.error);
+    fail(l.error);
     const snippets = await this.hydrateSnippets((s.data ?? []) as unknown as SnippetRow[]);
+    const lines = new Map((l.data ?? []).map((r) => [r.week_start as string, r.line as string]));
     return (w.data ?? [])
       .map((row) => ({
         weekStart: row.week_start as string,
         status: row.status as WeekStatus,
         publishedAt: row.published_at as string | null,
+        line: lines.get(row.week_start) ?? null,
         snippets: snippets.filter((x) => x.weekStart === row.week_start),
       }))
       .filter((wk) => wk.snippets.length > 0)
@@ -376,6 +396,7 @@ export class SupabaseApi implements Api {
       title: input.title.trim(),
       reflection: input.reflection.trim(),
       visibility: input.visibility,
+      kind: input.kind ?? null,
     };
 
     if (isNew) {
@@ -447,8 +468,20 @@ export class SupabaseApi implements Api {
     if (paths.length) await this.sb.storage.from('media').remove(paths);
   }
 
-  async publishWeek(weekStart: ISODate) {
+  async publishWeek(weekStart: ISODate, line?: string) {
     const { error } = await this.sb.rpc('publish_week', { wk: weekStart });
+    fail(error);
+    if (line?.trim()) await this.setWeekLine(weekStart, line);
+  }
+
+  async setWeekLine(weekStart: ISODate, line: string) {
+    const uid = await this.uid();
+    const text = line.trim();
+    const { error } = text
+      ? await this.sb.from('week_lines').upsert({
+          user_id: uid, week_start: weekStart, line: text, updated_at: new Date().toISOString(),
+        })
+      : await this.sb.from('week_lines').delete().eq('user_id', uid).eq('week_start', weekStart);
     fail(error);
   }
 
@@ -468,6 +501,39 @@ export class SupabaseApi implements Api {
     ]);
     const kept = (week.data?.status ?? 'draft') !== 'draft';
     return { ...s, author: this.toProfile(row.author!), shared: kept && s.visibility === 'friends' };
+  }
+
+  // -------------------------------------------------------------------------
+  // Looking back (owner-only tables)
+  // -------------------------------------------------------------------------
+
+  async addLookbackNote(snippetId: string, body: string): Promise<LookbackNote> {
+    const { data, error } = await this.sb
+      .from('lookback_notes')
+      .insert({ snippet_id: snippetId, body: body.trim(), written_on: today() })
+      .select(NOTE_COLS)
+      .single();
+    fail(error);
+    return this.toNote(data as NoteRow);
+  }
+
+  async deleteLookbackNote(id: string) {
+    const { error } = await this.sb.from('lookback_notes').delete().eq('id', id);
+    fail(error);
+  }
+
+  async monthPicks(): Promise<MonthPicks> {
+    const { data, error } = await this.sb.from('month_picks').select('month,snippet_id');
+    fail(error);
+    return Object.fromEntries((data ?? []).map((r) => [(r.month as string).slice(0, 7), r.snippet_id as string]));
+  }
+
+  async pickMonth(month: string, snippetId: string | null) {
+    const uid = await this.uid();
+    const { error } = snippetId
+      ? await this.sb.from('month_picks').upsert({ user_id: uid, month: `${month}-01`, snippet_id: snippetId })
+      : await this.sb.from('month_picks').delete().eq('user_id', uid).eq('month', `${month}-01`);
+    fail(error);
   }
 
   // -------------------------------------------------------------------------
@@ -517,6 +583,7 @@ export class SupabaseApi implements Api {
         weekStart: row.week_start as string,
         status: row.status as WeekStatus,
         publishedAt: row.published_at as string | null,
+        line: null, // weekly lines are owner-only
         snippets: snippets.filter((x) => x.weekStart === row.week_start),
       }))
       .filter((wk) => wk.snippets.length)

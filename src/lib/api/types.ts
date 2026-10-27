@@ -40,6 +40,27 @@ export type Comment = {
 /** Every moment is explicitly kept for yourself or shared with friends. There is no default. */
 export type Visibility = 'private' | 'friends';
 
+/** Optional: what kind of moment this was. Lets Lookback gather threads ("Your firsts this year"). */
+export type MomentKind = 'small_joy' | 'first_time' | 'proud_of' | 'hard_but_worth_it' | 'people';
+export const MOMENT_KINDS: { kind: MomentKind; label: string; prompt: string; thread: string }[] = [
+  { kind: 'small_joy', label: 'Small joy', prompt: 'What made this small thing feel good?', thread: 'Small joys' },
+  { kind: 'first_time', label: 'First time', prompt: 'What was new for you here?', thread: 'Your firsts' },
+  { kind: 'proud_of', label: 'Proud of', prompt: 'What did it take to get here?', thread: 'Things you were proud of' },
+  { kind: 'hard_but_worth_it', label: 'Hard but worth it', prompt: 'What made it worth it?', thread: 'Hard but worth it' },
+  { kind: 'people', label: 'People', prompt: 'What do you appreciate about them?', thread: 'Your people' },
+];
+export const isMomentKind = (k: unknown): k is MomentKind => MOMENT_KINDS.some((m) => m.kind === k);
+export const kindLabel = (k: MomentKind | null) => (k ? MOMENT_KINDS.find((m) => m.kind === k)?.label ?? null : null);
+
+/** A dated note added to a past moment later ("A year later, I still think about this"). Only ever the owner's. */
+export type LookbackNote = {
+  id: string;
+  snippetId: string;
+  body: string;
+  writtenOn: ISODate;
+  createdAt: string;
+};
+
 export type Snippet = {
   id: string;
   userId: string;
@@ -48,6 +69,9 @@ export type Snippet = {
   title: string;
   reflection: string;
   visibility: Visibility;
+  kind: MomentKind | null;
+  /** Your own looking-back notes, oldest first. Always empty on other people's moments. */
+  notes: LookbackNote[];
   media: MediaItem[];
   reactions: Reaction[];
   comments: Comment[];
@@ -60,8 +84,13 @@ export type Week = {
   weekStart: ISODate;
   status: WeekStatus;
   publishedAt: string | null;
+  /** Your private one-line answer when you kept the week. Never shown to anyone else. */
+  line: string | null;
   snippets: Snippet[];
 };
+
+/** "YYYY-MM" → the id of the moment that stood out that month. */
+export type MonthPicks = Record<string, string>;
 
 export type FriendWeek = {
   friend: Profile;
@@ -103,6 +132,7 @@ export type SnippetInput = {
   title: string;
   reflection: string;
   visibility: Visibility;
+  kind?: MomentKind | null;
   media: DraftMedia[];
 };
 
@@ -135,10 +165,20 @@ export interface Api {
   myArchive(): Promise<Week[]>;
   saveSnippet(input: SnippetInput, onProgress?: (fraction: number) => void): Promise<Snippet>;
   deleteSnippet(id: string): Promise<void>;
-  publishWeek(weekStart: ISODate): Promise<void>;
+  /** Keep your week on Sunday, optionally with its private one-line answer. */
+  publishWeek(weekStart: ISODate, line?: string): Promise<void>;
+  /** Set or clear (empty string) a week's private line. */
+  setWeekLine(weekStart: ISODate, line: string): Promise<void>;
   backfillWeek(weekStart: ISODate): Promise<void>;
   /** `shared`: friends can see it (marked for friends, and the week has been kept). */
   getSnippet(id: string): Promise<Snippet & { author: Profile; shared: boolean }>;
+
+  // Looking back (owner-only)
+  addLookbackNote(snippetId: string, body: string): Promise<LookbackNote>;
+  deleteLookbackNote(id: string): Promise<void>;
+  monthPicks(): Promise<MonthPicks>;
+  /** month is "YYYY-MM"; null clears the pick. */
+  pickMonth(month: string, snippetId: string | null): Promise<void>;
 
   // Friends' weeks
   friendsWeek(weekStart: ISODate): Promise<FriendWeek[]>;

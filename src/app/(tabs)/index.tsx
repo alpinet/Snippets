@@ -2,11 +2,13 @@ import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Check, Lock, Plus, Sparkles, Users } from 'lucide-react-native';
-import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { GettingStartedCard, LastWeekCard } from '../../components/HomeCards';
+import { KeepWeekSheet } from '../../components/KeepWeekSheet';
 import { MediaThumb } from '../../components/media';
 import { Card, ErrorNote, Loading, PrimaryButton, Screen, ScreenHeader } from '../../components/ui';
-import { api, type Snippet } from '../../lib/api';
+import { api, kindLabel, type Snippet } from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { openEditor } from '../../lib/nav';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
@@ -27,9 +29,11 @@ export default function Home() {
   const week = useMyWeek(wk);
   const online = useOnline();
 
+  const [keeping, setKeeping] = useState(false);
   const publish = useMutation({
-    mutationFn: () => api.publishWeek(wk),
+    mutationFn: (line: string) => api.publishWeek(wk, line),
     onSuccess: async () => {
+      setKeeping(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       track('week_kept', { moments: count, shared: sharedCount });
       await invalidateSnippets();
@@ -42,19 +46,6 @@ export default function Home() {
   const published = week.data?.status === 'published';
   const canAdd = count < MAX;
 
-  const confirmKeep = () =>
-    Alert.alert(
-      'Keep your week?',
-      [
-        `${count === 1 ? 'Your moment goes' : `Your ${count} moments go`} into your Lookback.`,
-        sharedCount === 0
-          ? 'All of it is just for you.'
-          : `${sharedCount === count ? (count === 1 ? 'It’s' : 'All are') : `${sharedCount} of ${count} are`} shared with friends.`,
-        'Then you can see what your friends shared.',
-      ].join(' '),
-      [{ text: 'Not yet', style: 'cancel' }, { text: 'Keep my week', onPress: () => publish.mutate() }],
-    );
-
   return (
     <Screen
       refreshControl={<RefreshControl refreshing={week.isRefetching} onRefresh={() => week.refetch()} tintColor={colors.ink3} />}
@@ -63,7 +54,7 @@ export default function Home() {
 
       <LastWeekCard weekStart={wk} />
       <GettingStartedCard weekStart={wk} momentsThisWeek={count} />
-      <PromptCard count={count} sunday={sunday} published={published} />
+      <PromptCard count={count} sunday={sunday} published={published} line={week.data?.line ?? null} />
 
       {week.isLoading ? (
         <Loading />
@@ -90,7 +81,7 @@ export default function Home() {
       {sunday && !published ? (
         <PrimaryButton
           title="Keep your week"
-          onPress={confirmKeep}
+          onPress={() => setKeeping(true)}
           disabled={count === 0 || !online}
           loading={publish.isPending}
           style={{ marginTop: 20 }}
@@ -99,11 +90,21 @@ export default function Home() {
       {!sunday && !published ? (
         <Text style={[type.small, styles.footnote]}>Your moments are yours. On Sunday, look back and keep your week.</Text>
       ) : null}
+      <KeepWeekSheet
+        visible={keeping}
+        count={count}
+        sharedCount={sharedCount}
+        loading={publish.isPending}
+        onKeep={(line) => publish.mutate(line)}
+        onClose={() => setKeeping(false)}
+      />
     </Screen>
   );
 }
 
-function PromptCard({ count, sunday, published }: { count: number; sunday: boolean; published: boolean }) {
+function PromptCard({ count, sunday, published, line }: {
+  count: number; sunday: boolean; published: boolean; line: string | null;
+}) {
   let title: string;
   let sub: string;
   if (published) {
@@ -124,6 +125,9 @@ function PromptCard({ count, sunday, published }: { count: number; sunday: boole
       <Icon size={26} color={colors.accent} strokeWidth={1.5} />
       <View style={{ flex: 1 }}>
         <Text style={type.prompt}>{title}</Text>
+        {published && line ? (
+          <Text style={[type.reflection, { fontSize: 16, lineHeight: 22, marginTop: 4 }]}>“{line}”</Text>
+        ) : null}
         <Text style={[type.secondary, { marginTop: 2 }, published && { color: colors.accent }]}>
           {sub}
           {published ? ' →' : ''}
@@ -197,7 +201,10 @@ function MomentCard({ snippet, onPress }: { snippet: Snippet; onPress: () => voi
         ) : null}
         <View style={styles.audience}>
           <AudienceIcon size={12} color={colors.ink3} strokeWidth={iconStroke} />
-          <Text style={styles.audienceText}>{shared ? 'Shared with friends' : 'Just for me'}</Text>
+          <Text style={styles.audienceText}>
+            {shared ? 'Shared with friends' : 'Just for me'}
+            {kindLabel(snippet.kind) ? ` · ${kindLabel(snippet.kind)}` : ''}
+          </Text>
         </View>
       </View>
       {cover ? <MediaThumb item={cover} style={styles.thumb} rounded={12} /> : null}
