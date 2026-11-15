@@ -27,25 +27,25 @@ export default function Intro() {
         </View>
       ),
       title: 'A few moments from your week.',
-      body: 'Snippets is a private weekly scrapbook for you and your closest friends.',
+      body: 'A private weekly journal for the moments that mattered to you.',
     },
     {
       key: 'small',
       art: <MomentsArt />,
       title: 'The small stuff counts.',
-      body: 'A good dinner. A rough game. A random Tuesday. Save up to three moments a week, using photos you already took.',
+      body: 'A good dinner. A rough game. Something you finally did. Keep the three that mattered each week, with a line about why.',
     },
     {
       key: 'sunday',
       art: <SundayArt />,
-      title: 'Share on Sunday. See theirs.',
-      body: 'Once a week, you and your friends swap weeks. Theirs open up when you share yours.',
+      title: 'Look back on Sunday.',
+      body: 'Once a week, take a minute to keep your week. Share any moment with close friends, or keep it just for you.',
     },
     {
       key: 'people',
       art: <PeopleArt />,
-      title: 'Just people you know.',
-      body: 'No followers, no feed, no likes, no streaks. And in a year, you’ll actually remember your year.',
+      title: 'In a year, you’ll remember your year.',
+      body: 'No followers, no feed, no likes, no streaks. Just what mattered, and the few people you choose to share it with.',
     },
   ];
   const last = page === slides.length - 1;

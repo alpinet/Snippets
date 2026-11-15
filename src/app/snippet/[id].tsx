@@ -6,17 +6,19 @@ import {
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { BackBar } from '../../components/BackBar';
+import { LookbackNotes } from '../../components/LookbackNotes';
 import { MediaPlayer } from '../../components/media';
 import { CommentInput, CommentList, ReactionBar } from '../../components/social';
 import { Avatar, ErrorNote, Loading, TextButton } from '../../components/ui';
 import { openEditor } from '../../lib/nav';
 import { useMe, useSnippet } from '../../lib/queries';
 import { blockUser, chooseAction, reportContent } from '../../lib/safety';
-import { formatDay } from '../../lib/week';
+import { kindLabel } from '../../lib/api';
+import { formatDay, today } from '../../lib/week';
 import { colors, gutter, iconStroke, type } from '../../theme';
 
 export default function SnippetDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, note } = useLocalSearchParams<{ id: string; note?: string }>();
   const snippet = useSnippet(id);
   const me = useMe();
   const { width } = useWindowDimensions();
@@ -77,13 +79,28 @@ export default function SnippetDetail() {
                 <Text style={[type.body, { fontWeight: '500' }]}>{s.author.displayName}</Text>
               </View>
             ) : null}
-            <Text style={type.small}>{formatDay(s.happenedOn)}</Text>
+            <Text style={type.small}>
+              {formatDay(s.happenedOn)}
+              {kindLabel(s.kind) ? ` · ${kindLabel(s.kind)}` : ''}
+            </Text>
             {s.title ? <Text style={[type.prompt, { fontSize: 22, marginTop: 4 }]}>{s.title}</Text> : null}
-            {s.reflection ? <Text style={[type.body, { marginTop: 8, fontSize: 16, lineHeight: 23 }]}>{s.reflection}</Text> : null}
+            {s.reflection ? <Text style={[type.reflection, { marginTop: 10 }]}>{s.reflection}</Text> : null}
+
+            {isMine ? (
+              <LookbackNotes
+                snippetId={s.id}
+                happenedOn={s.happenedOn}
+                notes={s.notes}
+                // Looking back needs some distance: from the day after the moment.
+                canAdd={s.happenedOn < today()}
+                autoFocus={note === '1'}
+              />
+            ) : null}
 
             {s.shared ? (
               <>
-                <View style={{ marginTop: 18 }}>
+                <Text style={[type.label, { marginTop: 26 }]}>From friends</Text>
+                <View style={{ marginTop: 10 }}>
                   <ReactionBar snippet={s} meId={meId} />
                 </View>
                 <View style={{ marginTop: 16 }}>
@@ -95,7 +112,9 @@ export default function SnippetDetail() {
               </>
             ) : (
               <Text style={[type.small, { marginTop: 18, color: colors.ink3 }]}>
-                Only you can see this until you share the week.
+                {s.visibility === 'private'
+                  ? 'Just for you. Only you will ever see this.'
+                  : 'Friends will see this once you keep your week on Sunday.'}
               </Text>
             )}
             {!isMine ? (

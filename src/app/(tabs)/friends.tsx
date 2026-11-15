@@ -90,8 +90,8 @@ export default function Friends() {
         <ErrorNote error={week.error} onRetry={refresh} />
       ) : all.length === 0 ? (
         <EmptyState
-          title="Who do you want to share your weeks with?"
-          body="Snippets is for a few close friends. Invite them and you’ll swap weeks every Sunday."
+          title="Share a few moments with close friends"
+          body="Optional. When you keep your week, you’ll see the moments your friends chose to share."
           action={<PrimaryButton title="Add friends" onPress={() => router.push('/friends/manage')} />}
         />
       ) : (
@@ -119,7 +119,7 @@ export default function Friends() {
             <>
               {sunday && notPosted.length ? (
                 <Card style={styles.listCard}>
-                  <Text style={[type.cardTitle, { marginBottom: 6 }]}>Haven’t posted yet</Text>
+                  <Text style={[type.cardTitle, { marginBottom: 6 }]}>Haven’t kept their week yet</Text>
                   {notPosted.map((f) => (
                     <NudgeRow key={f.friend.id} fw={f} />
                   ))}
@@ -129,25 +129,25 @@ export default function Friends() {
               {locked.length ? (
                 <Card style={styles.listCard}>
                   <Text style={[type.cardTitle, { marginBottom: 6 }]}>
-                    {sunday ? 'Shared their week' : 'Shared that week'}
+                    {sunday ? 'Kept their week' : 'Kept that week'}
                   </Text>
                   {locked.map((f) => (
                     <View key={f.friend.id} style={styles.row}>
                       <Avatar name={f.friend.displayName} url={f.friend.avatarUrl} size={40} />
                       <Text style={[type.body, { flex: 1, fontSize: 17 }]}>{f.friend.displayName}</Text>
                       <Lock size={16} color={colors.ink2} strokeWidth={iconStroke} />
-                      <Text style={type.small}>{f.snippetCount} {f.snippetCount === 1 ? 'moment' : 'moments'}</Text>
+                      <Text style={type.small}>{f.snippetCount ? `${f.snippetCount} shared` : 'kept privately'}</Text>
                     </View>
                   ))}
                   <Hairline style={{ marginVertical: 12 }} />
                   {sunday ? (
                     <View style={styles.lockedFooter}>
-                      <Text style={[type.secondary, { flex: 1 }]}>Share your week to see theirs.</Text>
+                      <Text style={[type.secondary, { flex: 1 }]}>Keep your week to see what they shared.</Text>
                       <TextButton title="Your week" onPress={() => router.navigate('/')} />
                     </View>
                   ) : (
                     <Text style={type.secondary}>
-                      You didn’t share that week, so theirs stay tucked away. Sunday’s a fresh start.
+                      You didn’t keep that week on its Sunday, so theirs stay tucked away. Sunday’s a fresh start.
                     </Text>
                   )}
                 </Card>
@@ -155,8 +155,8 @@ export default function Friends() {
 
               {!locked.length && !(sunday && notPosted.length) ? (
                 <EmptyState
-                  title={sunday ? 'Nobody’s shared yet' : 'A quiet week'}
-                  body={sunday ? 'Weeks show up here as friends share them today.' : 'Nobody shared that week. Sunday’s a fresh start.'}
+                  title={sunday ? 'Nothing shared yet' : 'A quiet week'}
+                  body={sunday ? 'Moments show up here as friends keep their weeks today.' : 'Nobody shared anything that week. Sunday’s a fresh start.'}
                 />
               ) : null}
             </>

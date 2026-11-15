@@ -95,7 +95,7 @@ export default function Profile() {
       <Card style={styles.group}>
         <Toggle
           label="Sunday reminder"
-          hint="One gentle note on Sunday evening if you haven’t shared."
+          hint="One gentle note on Sunday evening if you haven’t kept your week."
           value={s?.notifySunday}
           onChange={(v) => update.mutate({ notifySunday: v })}
         />
@@ -118,8 +118,8 @@ export default function Profile() {
       <SectionLabel style={styles.section}>Privacy</SectionLabel>
       <Card style={[styles.group, { paddingVertical: 14 }]}>
         <Text style={type.secondary}>
-          Only friends you approve can see your snippets. No public profiles, no followers, no ads, no algorithms.
-          Friends see your week only after they share theirs.
+          Moments marked “Just for me” are only ever visible to you. Moments you share are seen only by friends you
+          approve, after they keep their own week. No public profiles, no followers, no ads, no algorithms.
         </Text>
       </Card>
       <Card style={[styles.group, { marginTop: 10 }]}>

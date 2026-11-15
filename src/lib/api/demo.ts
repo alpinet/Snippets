@@ -2,11 +2,13 @@
 // Mirrors the server rules in supabase/migrations so the whole app can be exercised offline.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  addDays, currentWeekStart, dayIndex, isSunday, now, today, weekStartOf, type ISODate,
+  addDays, currentWeekStart, dayIndex, isSunday, monthKey, now, today, weekStartOf, type ISODate,
 } from '../week';
-import type {
-  AnalyticsEvent, Api, Comment, FriendRequest, FriendWeek, MediaItem, Profile, ReactionKind, ReportTarget, Session,
-  Settings, Snippet, SnippetInput, Week, WeekStatus,
+import {
+  isMomentKind,
+  type AnalyticsEvent, type Api, type Comment, type FriendRequest, type FriendWeek, type LookbackNote, type MediaItem,
+  type MomentKind, type MonthPicks, type Profile, type ReactionKind, type ReportTarget, type Session, type Settings,
+  type Snippet, type SnippetInput, type Visibility, type Week, type WeekStatus,
 } from './types';
 
 const KEY = 'snippets-demo-v1';
@@ -16,8 +18,9 @@ type DProfile = { id: string; username: string | null; displayName: string; avat
 type DWeek = { userId: string; weekStart: ISODate; status: WeekStatus; publishedAt: string | null };
 type DSnippet = {
   id: string; userId: string; weekStart: ISODate; happenedOn: ISODate; title: string;
-  reflection: string; createdAt: string; media: MediaItem[];
+  reflection: string; visibility: Visibility; kind: MomentKind | null; createdAt: string; media: MediaItem[];
 };
+type DNote = LookbackNote & { userId: string };
 type DB = {
   session: { userId: string; email: string | null } | null;
   profiles: Record<string, DProfile>;
@@ -27,6 +30,10 @@ type DB = {
   comments: { id: string; snippetId: string; userId: string; body: string; createdAt: string }[];
   friendships: { id: string; requester: string; recipient: string; status: 'pending' | 'accepted' }[];
   nudges: { from: string; to: string; weekStart: ISODate }[];
+  // Owner-only, like the lookback_notes / week_lines / month_picks tables.
+  notes: DNote[];
+  weekLines: { userId: string; weekStart: ISODate; line: string }[];
+  monthPicks: { userId: string; month: string; snippetId: string }[];
   blocks?: string[];
   events?: { name: AnalyticsEvent; props: Record<string, unknown>; at: string }[];
   reports?: (ReportTarget & { reason: string })[];
@@ -99,15 +106,22 @@ function seed(): DB {
       { id: 'f5', requester: 'dan', recipient: ME, status: 'pending' },
     ],
     nudges: [],
+    notes: [],
+    weekLines: [],
+    monthPicks: [],
     settings: { timezone: 'UTC', inviteCode: 'a1b2c3d4e5f6', notifySunday: true, notifyNudges: true, notifyFriendPosted: true, notifyReplies: true },
   };
 
-  const add = (userId: string, weekStart: ISODate, days: number[], status: WeekStatus, photos = [1, 2, 1]) => {
+  const add = (
+    userId: string, weekStart: ISODate, days: number[], status: WeekStatus, photos = [1, 2, 1], privateAt: number[] = [],
+  ) => {
     db.weeks.push({ userId, weekStart, status, publishedAt: status === 'draft' ? null : `${addDays(weekStart, 6)}T19:00:00Z` });
     days.forEach((d, i) => {
       const [title, reflection] = MOMENTS[momentCursor++ % MOMENTS.length];
       const s: DSnippet = {
         id: uid(), userId, weekStart, happenedOn: addDays(weekStart, d), title, reflection,
+        visibility: privateAt.includes(i) ? 'private' : 'friends',
+        kind: null,
         createdAt: `${addDays(weekStart, d)}T12:00:00Z`,
         media: Array.from({ length: photos[i % photos.length] }, photo),
       };
@@ -117,14 +131,14 @@ function seed(): DB {
 
   // This week: a couple of drafts on days that have already happened.
   const ti = dayIndex(t);
-  add(ME, cw, [0, Math.min(1, ti)].filter((d, i, a) => a.indexOf(d) === i), 'draft', [1, 1]);
+  add(ME, cw, [0, Math.min(1, ti)].filter((d, i, a) => a.indexOf(d) === i), 'draft', [1, 1], [1]);
   // Friends have drafted too; they become "posted" when Sunday arrives (see friendPosted).
-  add('sarah', cw, [0, 2, 5], 'published', [1, 2, 3]);
+  add('sarah', cw, [0, 2, 5], 'published', [1, 2, 3], [1]);
   add('mike', cw, [1, 4], 'published', [2, 1]);
 
   // Last week: everyone except Jess shared.
   const lw = addDays(cw, -7);
-  add(ME, lw, [0, 2, 5], 'published', [1, 1, 2]);
+  add(ME, lw, [0, 2, 5], 'published', [1, 1, 2], [2]);
   add('sarah', lw, [2, 5, 6], 'published', [1, 2, 3]);
   add('mike', lw, [1, 3], 'published', [2, 1]);
   add('priya', lw, [4], 'published', [3]);
@@ -148,12 +162,50 @@ function seed(): DB {
     if (w === 5 || w === 9 || w === 14) continue; // weeks I missed (backfill candidates)
     const status: WeekStatus = w === 7 ? 'draft' : w === 17 ? 'backfilled' : 'published';
     const count = 1 + ((w * 7) % 3);
-    add(ME, ws, [0, 2, 5].slice(0, count), status, [1, 2, 1]);
+    add(ME, ws, [0, 2, 5].slice(0, count), status, [1, 2, 1], w % 4 === 0 ? [count - 1] : []);
     const mine = db.snippets.filter((s) => s.userId === ME && s.weekStart === ws);
     if (status === 'published' && w % 3 !== 0) {
       db.comments.push({ id: uid(), snippetId: mine[0].id, userId: 'mike', body: 'this is great', createdAt: `${addDays(ws, 6)}T20:00:00Z` });
     }
   }
+
+  // Lookback: kinds on some of my moments, a few looking-back notes, weekly lines, a month pick.
+  const KINDS: MomentKind[] = ['small_joy', 'first_time', 'proud_of', 'people', 'hard_but_worth_it', 'first_time'];
+  const mineKept = db.snippets
+    .filter((s) => s.userId === ME && s.weekStart < cw)
+    .sort((a, b) => b.happenedOn.localeCompare(a.happenedOn));
+  mineKept.forEach((s, i) => {
+    if (i % 2 === 0) s.kind = KINDS[(i / 2) % KINDS.length];
+  });
+  const note = (s: DSnippet | undefined, body: string, daysAfter: number) => {
+    if (!s) return;
+    const writtenOn = addDays(s.happenedOn, daysAfter) > t ? t : addDays(s.happenedOn, daysAfter);
+    db.notes.push({ id: uid(), snippetId: s.id, userId: s.userId, body, writtenOn, createdAt: `${writtenOn}T21:00:00Z` });
+  };
+  note(mineKept.find((s) => s.weekStart === addDays(cw, -28)), 'Funny how this already feels like a long time ago.', 28);
+  note(mineKept[mineKept.length - 1], 'Months later, this is still one of my favourite days.', 120);
+  note(mineKept[mineKept.length - 1], 'Went back again last week. Not the same, still good.', 140);
+  // Sarah's own note on her shared ramen moment: hers alone, never visible to friends.
+  note(sarahWed, 'Still dreaming about that broth.', 7);
+
+  const LINES = [
+    'Slower than I wanted, and that was fine.',
+    'More time outside than inside.',
+    'I said yes to things.',
+    'Tired, but the good kind.',
+    'A week of small wins.',
+  ];
+  db.weeks
+    .filter((w) => w.userId === ME && w.status !== 'draft')
+    .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+    .forEach((w, i) => {
+      if (i % 3 !== 2) db.weekLines.push({ userId: ME, weekStart: w.weekStart, line: LINES[i % LINES.length] });
+    });
+  db.weekLines.push({ userId: 'sarah', weekStart: lw, line: 'Ramen and long walks.' });
+
+  // Two months back already has its pick.
+  const pickFrom = mineKept.find((s) => monthKey(s.happenedOn) < monthKey(addDays(t, -31)));
+  if (pickFrom) db.monthPicks.push({ userId: ME, month: monthKey(pickFrom.happenedOn), snippetId: pickFrom.id });
   return db;
 }
 
@@ -172,6 +224,13 @@ export class DemoApi implements Api {
     }
     // Fill settings added after this device's demo data was created.
     this.db.settings.notifyReplies ??= true;
+    for (const x of this.db.snippets) {
+      x.visibility ??= 'friends';
+      x.kind ??= null;
+    }
+    this.db.notes ??= [];
+    this.db.weekLines ??= [];
+    this.db.monthPicks ??= [];
     this.sanitize(this.db);
     // Dev convenience (screenshots / QA): start signed in as the seeded user.
     if (process.env.EXPO_PUBLIC_DEMO_AUTOLOGIN === '1' && !this.db.session) {
@@ -230,7 +289,12 @@ export class DemoApi implements Api {
     const db = this.db!;
     return {
       id: s.id, userId: s.userId, weekStart: s.weekStart, happenedOn: s.happenedOn, title: s.title,
-      reflection: s.reflection, createdAt: s.createdAt, media: s.media,
+      reflection: s.reflection, visibility: s.visibility, kind: s.kind ?? null, createdAt: s.createdAt, media: s.media,
+      // Looking-back notes are owner-only: other people's moments never carry them.
+      notes: s.userId !== ME ? [] : db.notes
+        .filter((n) => n.snippetId === s.id && n.userId === ME)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(({ userId: _owner, ...n }) => n),
       reactions: db.reactions.filter((r) => r.snippetId === s.id).map((r) => ({ userId: r.userId, kind: r.kind })),
       comments: db.comments
         .filter((c) => c.snippetId === s.id && !(db.blocks ?? []).includes(c.userId))
@@ -241,6 +305,10 @@ export class DemoApi implements Api {
 
   private weekRow(userId: string, weekStart: ISODate) {
     return this.db!.weeks.find((w) => w.userId === userId && w.weekStart === weekStart);
+  }
+
+  private weekLine(weekStart: ISODate): string | null {
+    return this.db!.weekLines.find((l) => l.userId === ME && l.weekStart === weekStart)?.line ?? null;
   }
 
   private friendIds(): string[] {
@@ -261,6 +329,11 @@ export class DemoApi implements Api {
     const w = this.weekRow(owner, weekStart);
     const sharedByOwner = w?.status === 'backfilled' || this.friendPosted(owner, weekStart);
     return this.friendIds().includes(owner) && sharedByOwner && this.weekRow(ME, weekStart)?.status === 'published';
+  }
+
+  /** Friends only ever see moments marked for friends (mirrors can_view_snippet). */
+  private canViewSnippet(s: DSnippet): boolean {
+    return s.userId === ME || (s.visibility === 'friends' && this.canView(s.userId, s.weekStart));
   }
 
   private emit() {
@@ -359,6 +432,7 @@ export class DemoApi implements Api {
       weekStart,
       status: w?.status ?? 'draft',
       publishedAt: w?.publishedAt ?? null,
+      line: this.weekLine(weekStart),
       snippets: db.snippets
         .filter((s) => s.userId === ME && s.weekStart === weekStart)
         .sort((a, b) => a.happenedOn.localeCompare(b.happenedOn) || a.createdAt.localeCompare(b.createdAt))
@@ -375,6 +449,7 @@ export class DemoApi implements Api {
           weekStart: w.weekStart,
           status: w.status,
           publishedAt: w.publishedAt,
+          line: this.weekLine(w.weekStart),
           snippets: db.snippets
             .filter((s) => s.userId === ME && s.weekStart === w.weekStart)
             .sort((a, b) => a.happenedOn.localeCompare(b.happenedOn))
@@ -393,6 +468,10 @@ export class DemoApi implements Api {
     if (input.media.length < 1) throw new Error('Add at least one photo or video');
     if (input.media.length > 3) throw new Error('A moment holds up to 3 photos or videos');
 
+    if (input.visibility !== 'private' && input.visibility !== 'friends') {
+      throw new Error('Choose who this moment is for');
+    }
+    if (input.kind != null && !isMomentKind(input.kind)) throw new Error('That isn’t a kind of moment');
     let s = input.id ? db.snippets.find((x) => x.id === input.id && x.userId === ME) : undefined;
     if (!s) {
       const count = db.snippets.filter((x) => x.userId === ME && x.weekStart === input.weekStart).length;
@@ -400,12 +479,17 @@ export class DemoApi implements Api {
       if (!this.weekRow(ME, input.weekStart)) {
         db.weeks.push({ userId: ME, weekStart: input.weekStart, status: 'draft', publishedAt: null });
       }
-      s = { id: uid(), userId: ME, weekStart: input.weekStart, happenedOn: input.happenedOn, title: '', reflection: '', createdAt: now().toISOString(), media: [] };
+      s = {
+        id: uid(), userId: ME, weekStart: input.weekStart, happenedOn: input.happenedOn, title: '', reflection: '',
+        visibility: input.visibility, kind: null, createdAt: now().toISOString(), media: [],
+      };
       db.snippets.push(s);
     }
     s.happenedOn = input.happenedOn;
     s.title = input.title.trim();
     s.reflection = input.reflection.trim();
+    s.visibility = input.visibility;
+    s.kind = input.kind ?? null;
     s.media = input.media.map((m) =>
       m.local
         ? { id: uid(), kind: m.kind, url: m.uri, thumbUrl: null, cacheKey: m.uri, width: m.width, height: m.height, durationMs: m.durationMs }
@@ -424,16 +508,21 @@ export class DemoApi implements Api {
     db.snippets = db.snippets.filter((x) => x.id !== id);
     db.reactions = db.reactions.filter((r) => r.snippetId !== id);
     db.comments = db.comments.filter((c) => c.snippetId !== id);
+    db.notes = db.notes.filter((n) => n.snippetId !== id);
+    db.monthPicks = db.monthPicks.filter((p) => p.snippetId !== id);
     if (s && !db.snippets.some((x) => x.userId === ME && x.weekStart === s.weekStart)) {
       db.weeks = db.weeks.filter((w) => !(w.userId === ME && w.weekStart === s.weekStart && w.status === 'draft'));
+      if (!this.weekRow(ME, s.weekStart)) {
+        db.weekLines = db.weekLines.filter((l) => !(l.userId === ME && l.weekStart === s.weekStart));
+      }
     }
     await this.save();
   }
 
-  async publishWeek(weekStart: ISODate) {
+  async publishWeek(weekStart: ISODate, line?: string) {
     const db = await this.load();
-    if (weekStart !== currentWeekStart()) throw new Error('Only this week can be shared');
-    if (!isSunday()) throw new Error('Sharing opens on Sunday');
+    if (weekStart !== currentWeekStart()) throw new Error('Only this week can be kept');
+    if (!isSunday()) throw new Error('You can keep your week on Sunday');
     const w = this.weekRow(ME, weekStart);
     if (!w || !db.snippets.some((s) => s.userId === ME && s.weekStart === weekStart)) {
       throw new Error('Add at least one moment first');
@@ -443,7 +532,18 @@ export class DemoApi implements Api {
       w.publishedAt = now().toISOString();
     }
     await this.save();
+    if (line?.trim()) await this.setWeekLine(weekStart, line);
     await this.delay(null, 400);
+  }
+
+  async setWeekLine(weekStart: ISODate, line: string) {
+    const db = await this.load();
+    const text = line.trim();
+    if (text.length > 140) throw new Error('Keep it to one line');
+    if (!this.weekRow(ME, weekStart)) throw new Error('Add at least one moment first');
+    db.weekLines = db.weekLines.filter((l) => !(l.userId === ME && l.weekStart === weekStart));
+    if (text) db.weekLines.push({ userId: ME, weekStart, line: text });
+    await this.save();
   }
 
   async backfillWeek(weekStart: ISODate) {
@@ -463,9 +563,47 @@ export class DemoApi implements Api {
   async getSnippet(id: string) {
     const db = await this.load();
     const s = db.snippets.find((x) => x.id === id);
-    if (!s || !this.canView(s.userId, s.weekStart)) throw new Error('This moment isn’t available');
-    const shared = (this.weekRow(s.userId, s.weekStart)?.status ?? 'draft') !== 'draft';
+    if (!s || !this.canViewSnippet(s)) throw new Error('This moment isn’t available');
+    const kept = (this.weekRow(s.userId, s.weekStart)?.status ?? 'draft') !== 'draft';
+    const shared = kept && s.visibility === 'friends';
     return this.delay({ ...this.snippet(s), author: this.profile(s.userId), shared });
+  }
+
+  // Looking back (owner-only) ---------------------------------------------------
+
+  async addLookbackNote(snippetId: string, body: string): Promise<LookbackNote> {
+    const db = await this.load();
+    const s = db.snippets.find((x) => x.id === snippetId);
+    if (!s || s.userId !== ME) throw new Error('Not allowed');
+    const text = body.trim();
+    if (!text || text.length > 1000) throw new Error('Notes are 1–1000 characters');
+    const n: DNote = { id: uid(), snippetId, userId: ME, body: text, writtenOn: today(), createdAt: now().toISOString() };
+    db.notes.push(n);
+    await this.save();
+    const { userId: _owner, ...note } = n;
+    return note;
+  }
+
+  async deleteLookbackNote(id: string) {
+    const db = await this.load();
+    db.notes = db.notes.filter((n) => !(n.id === id && n.userId === ME));
+    await this.save();
+  }
+
+  async monthPicks(): Promise<MonthPicks> {
+    const db = await this.load();
+    return Object.fromEntries(db.monthPicks.filter((p) => p.userId === ME).map((p) => [p.month, p.snippetId]));
+  }
+
+  async pickMonth(month: string, snippetId: string | null) {
+    const db = await this.load();
+    if (snippetId) {
+      const s = db.snippets.find((x) => x.id === snippetId);
+      if (!s || s.userId !== ME || monthKey(s.happenedOn) !== month) throw new Error('Pick one of your moments from that month');
+    }
+    db.monthPicks = db.monthPicks.filter((p) => !(p.userId === ME && p.month === month));
+    if (snippetId) db.monthPicks.push({ userId: ME, month, snippetId });
+    await this.save();
   }
 
   // Friends' weeks -------------------------------------------------------------
@@ -477,7 +615,7 @@ export class DemoApi implements Api {
         .map((id) => {
           const posted = this.friendPosted(id, weekStart);
           const unlocked = this.canView(id, weekStart);
-          const snippets = db.snippets.filter((s) => s.userId === id && s.weekStart === weekStart);
+          const snippets = db.snippets.filter((s) => s.userId === id && s.weekStart === weekStart && s.visibility === 'friends');
           return {
             friend: this.profile(id),
             posted,
@@ -502,8 +640,9 @@ export class DemoApi implements Api {
           weekStart: w.weekStart,
           status: w.status,
           publishedAt: w.publishedAt,
+          line: null, // weekly lines are owner-only
           snippets: db.snippets
-            .filter((s) => s.userId === friendId && s.weekStart === w.weekStart)
+            .filter((s) => s.userId === friendId && s.weekStart === w.weekStart && s.visibility === 'friends')
             .map((s) => this.snippet(s)),
         }))
         .filter((w) => w.snippets.length)
@@ -514,7 +653,7 @@ export class DemoApi implements Api {
   async react(snippetId: string, kind: ReactionKind | null) {
     const db = await this.load();
     const s = db.snippets.find((x) => x.id === snippetId);
-    if (!s || !this.canView(s.userId, s.weekStart)) throw new Error('Not allowed');
+    if (!s || !this.canViewSnippet(s)) throw new Error('Not allowed');
     db.reactions = db.reactions.filter((r) => !(r.snippetId === snippetId && r.userId === ME));
     if (kind) db.reactions.push({ snippetId, userId: ME, kind });
     await this.save();
@@ -523,7 +662,7 @@ export class DemoApi implements Api {
   async comment(snippetId: string, body: string) {
     const db = await this.load();
     const s = db.snippets.find((x) => x.id === snippetId);
-    if (!s || !this.canView(s.userId, s.weekStart)) throw new Error('Not allowed');
+    if (!s || !this.canViewSnippet(s)) throw new Error('Not allowed');
     const text = body.trim();
     if (!text || text.length > 500) throw new Error('Comments are 1–500 characters');
     const c = { id: uid(), snippetId, userId: ME, body: text, createdAt: now().toISOString() };

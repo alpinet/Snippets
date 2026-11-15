@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { REACTIONS, type Comment, type Snippet } from '../lib/api';
+import { REACTIONS, kindLabel, type Comment, type Snippet } from '../lib/api';
 import { useComment, useDeleteComment, useReact } from '../lib/queries';
 import { chooseAction, reportContent } from '../lib/safety';
 import { formatDay } from '../lib/week';
@@ -127,18 +127,23 @@ export function CommentInput({ snippetId }: { snippetId: string }) {
 /** One snippet, spotlighted: date, collage, title, reflection, reactions, comments. */
 export function SnippetCard({ snippet, meId, width, commentLimit = 2, social = true }: {
   snippet: Snippet; meId: string; width?: number; commentLimit?: number;
-  /** false for private drafts: no reactions or comments yet. */
+  /** false for moments friends can't see (private, or the week isn't kept): no reactions or comments. */
   social?: boolean;
 }) {
   const open = () => router.push({ pathname: '/snippet/[id]', params: { id: snippet.id } });
   return (
     <View style={[cardStyle, styles.card, width ? { width } : null]}>
       <Collage media={snippet.media} height={200} onPress={open} />
-      <Text style={[type.small, { marginTop: 12 }]}>{formatDay(snippet.happenedOn)}</Text>
+      <Text style={[type.small, { marginTop: 12 }]}>
+        {formatDay(snippet.happenedOn)}
+        {kindLabel(snippet.kind) ? ` · ${kindLabel(snippet.kind)}` : ''}
+      </Text>
       <Pressable onPress={open}>
         {snippet.title ? <Text style={[type.cardTitle, { fontSize: 19, marginTop: 4 }]}>{snippet.title}</Text> : null}
         {snippet.reflection ? (
-          <Text style={[type.secondary, { marginTop: 4, color: '#6E655E' }]} numberOfLines={4}>{snippet.reflection}</Text>
+          <Text style={[type.reflection, { fontSize: 16, lineHeight: 23, marginTop: 4, color: '#6E655E' }]} numberOfLines={4}>
+            {snippet.reflection}
+          </Text>
         ) : null}
       </Pressable>
       {social ? (

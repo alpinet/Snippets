@@ -15,8 +15,8 @@ export default function OnboardingProfile() {
         contentContainerStyle={{ paddingHorizontal: gutter + 8, paddingTop: insets.top + 40, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={type.title}>What should friends call you?</Text>
-        <Text style={[type.subline, { marginTop: 4, marginBottom: 28 }]}>Only people you add will see this.</Text>
+        <Text style={type.title}>What should we call you?</Text>
+        <Text style={[type.subline, { marginTop: 4, marginBottom: 28 }]}>Friends you add will see this name too.</Text>
         {me.data ? (
           <ProfileForm initial={me.data} submitLabel="Continue" onDone={() => router.push('/add-friends')} />
         ) : (

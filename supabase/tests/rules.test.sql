@@ -1,7 +1,7 @@
 -- Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(20);
 
 -- Users: A and B are friends, C is a stranger.
 insert into auth.users (id, email) values
@@ -19,8 +19,8 @@ $$;
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 set local role authenticated;
 select lives_ok($$
-  insert into snippets (week_start, happened_on, title)
-  values (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 7, 'ramen')
+  insert into snippets (week_start, happened_on, title, visibility)
+  values (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 7, 'ramen', 'friends')
 $$, 'owner can create a snippet in a past week');
 select is((select count(*)::int from snippets), 1, 'owner sees own draft');
 
@@ -58,13 +58,45 @@ select is((select count(*)::int from snippets), 0, 'strangers see nothing');
 -- Limits: 3 moments per week.
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 select lives_ok($$
-  insert into snippets (week_start, happened_on) values
-    (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 6),
-    (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 5)
+  insert into snippets (id, week_start, happened_on, title, visibility) values
+    ('00000000-0000-0000-0000-0000000000f1', date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 6, 'just for me', 'private'),
+    (gen_random_uuid(), date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 5, 'shared too', 'friends')
 $$, 'up to three moments');
 select throws_like($$
-  insert into snippets (week_start, happened_on) values (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 4)
+  insert into snippets (week_start, happened_on, visibility) values (date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 4, 'friends')
 $$, '%up to 3 moments%', 'a fourth moment is rejected');
+
+-- Reflection first: there is no default visibility.
+select throws_ok($$
+  insert into snippets (week_start, happened_on) values (date_trunc('week', now())::date - 14, date_trunc('week', now())::date - 14)
+$$, '23502', null, 'a moment must be marked private or shared');
+select throws_ok($$
+  insert into snippets (week_start, happened_on, visibility) values (date_trunc('week', now())::date - 14, date_trunc('week', now())::date - 14, 'public')
+$$, '23514', null, 'only private or friends is allowed');
+
+-- Friend B (who kept that week) sees A's two shared moments but never the private one.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select is((select count(*)::int from snippets), 2, 'friends see shared moments only');
+select is((select count(*)::int from snippets where title = 'just for me'), 0, 'a private moment stays private');
+select throws_ok($$
+  insert into reactions (snippet_id, kind) values ('00000000-0000-0000-0000-0000000000f1', 'heart')
+$$, '42501', null, 'cannot react to a private moment');
+reset role;
+select is(
+  (select count(*)::int from (select can_view_snippet(id) v from snippets where title = 'just for me') x where v),
+  0, 'private media/comments are gated too');
+set local role authenticated;
+
+-- Keeping a week with only private moments still unlocks friends' shared moments.
+reset role;
+update weeks set status = 'draft' where user_id = '00000000-0000-0000-0000-00000000000b';
+insert into snippets (user_id, week_start, happened_on, title, visibility) values
+  ('00000000-0000-0000-0000-00000000000b', date_trunc('week', now())::date - 7, date_trunc('week', now())::date - 7, 'quiet week', 'private');
+update weeks set status = 'published' where user_id = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+set local role authenticated;
+select is((select count(*)::int from snippets where user_id = '00000000-0000-0000-0000-00000000000a'), 2,
+  'a privately kept week unlocks friends'' shared moments');
 
 -- Hardening: blank comments rejected; blocking hides comments and prevents re-adding.
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');

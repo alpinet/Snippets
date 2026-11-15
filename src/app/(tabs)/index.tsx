@@ -1,20 +1,21 @@
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { CalendarClock, Check, Plus, Sparkles } from 'lucide-react-native';
-import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Check, Lock, Plus, Sparkles, Users } from 'lucide-react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { GettingStartedCard, LastWeekCard } from '../../components/HomeCards';
+import { KeepWeekSheet } from '../../components/KeepWeekSheet';
 import { MediaThumb } from '../../components/media';
 import { Card, ErrorNote, Loading, PrimaryButton, Screen, ScreenHeader } from '../../components/ui';
-import { api, type Snippet } from '../../lib/api';
+import { api, kindLabel, type Snippet } from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { openEditor } from '../../lib/nav';
 import { invalidateSnippets, useMyWeek } from '../../lib/queries';
 import { useOnline } from '../../lib/useOnline';
 import { useTick } from '../../lib/useTick';
 import {
-  DAY_SHORT, addDays, currentWeekStart, formatDay, formatWeekRange, isSunday, now, today, untilSunday, weekDays,
-  type ISODate,
+  DAY_SHORT, currentWeekStart, formatWeekRange, isSunday, today, weekDays, type ISODate,
 } from '../../lib/week';
 import { colors, iconStroke, type } from '../../theme';
 
@@ -28,38 +29,32 @@ export default function Home() {
   const week = useMyWeek(wk);
   const online = useOnline();
 
+  const [keeping, setKeeping] = useState(false);
   const publish = useMutation({
-    mutationFn: () => api.publishWeek(wk),
+    mutationFn: (line: string) => api.publishWeek(wk, line),
     onSuccess: async () => {
+      setKeeping(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      track('week_shared', { moments: count });
+      track('week_kept', { moments: count, shared: sharedCount });
       await invalidateSnippets();
-      router.navigate('/friends');
     },
   });
 
   const snippets = week.data?.snippets ?? [];
   const count = snippets.length;
+  const sharedCount = snippets.filter((s) => s.visibility === 'friends').length;
   const published = week.data?.status === 'published';
   const canAdd = count < MAX;
-
-  const confirmShare = () =>
-    Alert.alert(
-      'Share your week?',
-      `Your ${count === 1 ? 'moment' : `${count} moments`} will be shared with your friends, and their weeks will open up for you.`,
-      [{ text: 'Not yet', style: 'cancel' }, { text: 'Share', onPress: () => publish.mutate() }],
-    );
 
   return (
     <Screen
       refreshControl={<RefreshControl refreshing={week.isRefetching} onRefresh={() => week.refetch()} tintColor={colors.ink3} />}
     >
-      <ScreenHeader large title="Snippets" subline={`This week · ${formatWeekRange(wk)}`} />
+      <ScreenHeader title="This week" subline={formatWeekRange(wk)} />
 
-      <CheckInBanner weekStart={wk} sunday={sunday} published={published} />
       <LastWeekCard weekStart={wk} />
       <GettingStartedCard weekStart={wk} momentsThisWeek={count} />
-      <PromptCard count={count} sunday={sunday} published={published} />
+      <PromptCard count={count} sunday={sunday} published={published} line={week.data?.line ?? null} />
 
       {week.isLoading ? (
         <Loading />
@@ -85,61 +80,44 @@ export default function Home() {
 
       {sunday && !published ? (
         <PrimaryButton
-          title="Share your week"
-          onPress={confirmShare}
+          title="Keep your week"
+          onPress={() => setKeeping(true)}
           disabled={count === 0 || !online}
           loading={publish.isPending}
           style={{ marginTop: 20 }}
         />
       ) : null}
       {!sunday && !published ? (
-        <Text style={[type.small, styles.footnote]}>Drafts stay private until you share them on Sunday.</Text>
+        <Text style={[type.small, styles.footnote]}>Your moments are yours. On Sunday, look back and keep your week.</Text>
       ) : null}
+      <KeepWeekSheet
+        visible={keeping}
+        count={count}
+        sharedCount={sharedCount}
+        loading={publish.isPending}
+        onKeep={(line) => publish.mutate(line)}
+        onClose={() => setKeeping(false)}
+      />
     </Screen>
   );
 }
 
-/** When the next Sunday check-in is — a gentle countdown, not urgency (§38). */
-function CheckInBanner({ weekStart, sunday, published }: { weekStart: ISODate; sunday: boolean; published: boolean }) {
-  const thisSunday = addDays(weekStart, 6);
-  let title: string;
-  let detail: string;
-  if (sunday && published) {
-    title = `Next check-in ${formatDay(addDays(thisSunday, 7))}`;
-    detail = 'in 7 days';
-  } else if (sunday) {
-    const n = now();
-    const left = 24 * 60 - (n.getHours() * 60 + n.getMinutes());
-    title = 'Check-in is open today';
-    detail = `${Math.floor(left / 60)}h ${left % 60}m left`;
-  } else {
-    const { days, hours, minutes } = untilSunday();
-    title = `Check-in opens ${formatDay(thisSunday)}`;
-    detail = days > 0 ? `in ${days}d ${hours}h` : hours > 0 ? `in ${hours}h ${minutes}m` : `in ${minutes}m`;
-  }
-  return (
-    <View style={styles.checkIn}>
-      <CalendarClock size={20} color={colors.accent} strokeWidth={iconStroke} />
-      <Text style={[type.body, { flex: 1, fontWeight: '500' }]}>{title}</Text>
-      <View style={styles.checkInPill}>
-        <Text style={styles.checkInPillText}>{detail}</Text>
-      </View>
-    </View>
-  );
-}
-
-function PromptCard({ count, sunday, published }: { count: number; sunday: boolean; published: boolean }) {
+function PromptCard({ count, sunday, published, line }: {
+  count: number; sunday: boolean; published: boolean; line: string | null;
+}) {
   let title: string;
   let sub: string;
   if (published) {
-    title = 'Your week is shared.';
-    sub = 'See what your friends were up to';
+    title = 'Your week is kept.';
+    sub = 'Friends’ shared moments are open now';
   } else if (sunday) {
-    title = 'What was your week like?';
-    sub = count === 0 ? 'Add up to 3 moments from any day this week.' : `${count} of 3 moments ready to share.`;
+    title = 'Looking back, what mattered this week?';
+    sub = count === 0
+      ? 'Add up to 3 moments, then keep your week.'
+      : `${count} of 3 moments. Keep your week when you’re ready.`;
   } else {
     title = 'What mattered to you this week?';
-    sub = count >= MAX ? 'Your 3 moments are saved. Tap one to edit or swap it.' : 'Add up to 3 moments from any day this week.';
+    sub = count >= MAX ? 'These are your 3. Tap one to change it.' : 'Up to 3 moments, from any day this week.';
   }
   const Icon = published ? Check : Sparkles;
   return (
@@ -147,6 +125,9 @@ function PromptCard({ count, sunday, published }: { count: number; sunday: boole
       <Icon size={26} color={colors.accent} strokeWidth={1.5} />
       <View style={{ flex: 1 }}>
         <Text style={type.prompt}>{title}</Text>
+        {published && line ? (
+          <Text style={[type.reflection, { fontSize: 16, lineHeight: 22, marginTop: 4 }]}>“{line}”</Text>
+        ) : null}
         <Text style={[type.secondary, { marginTop: 2 }, published && { color: colors.accent }]}>
           {sub}
           {published ? ' →' : ''}
@@ -207,13 +188,24 @@ function DayRow({ day, label, isToday, isFuture, snippets, canAdd, onAdd }: {
 
 function MomentCard({ snippet, onPress }: { snippet: Snippet; onPress: () => void }) {
   const cover = snippet.media[0];
+  const shared = snippet.visibility === 'friends';
+  const AudienceIcon = shared ? Users : Lock;
   return (
     <Card onPress={onPress} style={styles.moment}>
       <View style={{ flex: 1, paddingRight: 12 }}>
         <Text style={type.cardTitle} numberOfLines={2}>{snippet.title || 'Untitled moment'}</Text>
         {snippet.reflection ? (
-          <Text style={[type.secondary, { marginTop: 3 }]} numberOfLines={1}>{snippet.reflection}</Text>
+          <Text style={[type.reflection, { fontSize: 15, lineHeight: 21, color: colors.ink2, marginTop: 3 }]} numberOfLines={1}>
+            {snippet.reflection}
+          </Text>
         ) : null}
+        <View style={styles.audience}>
+          <AudienceIcon size={12} color={colors.ink3} strokeWidth={iconStroke} />
+          <Text style={styles.audienceText}>
+            {shared ? 'Shared with friends' : 'Just for me'}
+            {kindLabel(snippet.kind) ? ` · ${kindLabel(snippet.kind)}` : ''}
+          </Text>
+        </View>
       </View>
       {cover ? <MediaThumb item={cover} style={styles.thumb} rounded={12} /> : null}
     </Card>
@@ -224,18 +216,6 @@ const LABEL_W = 52;
 
 const styles = StyleSheet.create({
   prompt: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, marginBottom: 22 },
-  checkIn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.accentSoft,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 12,
-  },
-  checkInPill: { backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  checkInPillText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   timeline: { position: 'relative' },
   rail: {
     position: 'absolute',
@@ -257,6 +237,8 @@ const styles = StyleSheet.create({
   },
   moment: { flexDirection: 'row', alignItems: 'center', padding: 14, paddingLeft: 16 },
   thumb: { width: 64, height: 64 },
+  audience: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  audienceText: { fontSize: 12, color: colors.ink3 },
   addSlot: { height: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
   todayPill: { backgroundColor: colors.accentSoft, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 },
   todayPillText: { color: colors.accent, fontSize: 14, fontWeight: '500' },

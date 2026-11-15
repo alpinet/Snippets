@@ -23,15 +23,15 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color }) => <House color={color} size={24} strokeWidth={iconStroke} /> }}
-      />
-      <Tabs.Screen
-        name="friends"
-        options={{ title: 'Friends', tabBarIcon: ({ color }) => <Users color={color} size={24} strokeWidth={iconStroke} /> }}
+        options={{ title: 'This week', tabBarIcon: ({ color }) => <House color={color} size={24} strokeWidth={iconStroke} /> }}
       />
       <Tabs.Screen
         name="lookback"
         options={{ title: 'Lookback', tabBarIcon: ({ color }) => <History color={color} size={24} strokeWidth={iconStroke} /> }}
+      />
+      <Tabs.Screen
+        name="friends"
+        options={{ title: 'Friends', tabBarIcon: ({ color }) => <Users color={color} size={24} strokeWidth={iconStroke} /> }}
       />
       <Tabs.Screen
         name="profile"

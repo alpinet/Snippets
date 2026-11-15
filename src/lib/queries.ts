@@ -26,6 +26,7 @@ export const keys = {
   snippet: (id: string) => ['snippet', id] as const,
   friends: ['friends'] as const,
   requests: ['requests'] as const,
+  monthPicks: ['monthPicks'] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: () => api.me() });
@@ -38,12 +39,13 @@ export const useFriendHistory = (id: string, enabled = true) =>
   useQuery({ queryKey: keys.friendHistory(id), queryFn: () => api.friendHistory(id), enabled: enabled && !!id });
 export const useSnippet = (id: string) => useQuery({ queryKey: keys.snippet(id), queryFn: () => api.getSnippet(id) });
 export const useFriends = () => useQuery({ queryKey: keys.friends, queryFn: () => api.friends() });
+export const useMonthPicks = () => useQuery({ queryKey: keys.monthPicks, queryFn: () => api.monthPicks() });
 export const useRequests = () => useQuery({ queryKey: keys.requests, queryFn: () => api.friendRequests() });
 
 /** Anything touching snippets, reactions or comments invalidates the snippet views. */
 export function invalidateSnippets() {
   return Promise.all(
-    ['myWeek', 'archive', 'friendsWeek', 'friendHistory', 'snippet'].map((k) =>
+    ['myWeek', 'archive', 'friendsWeek', 'friendHistory', 'snippet', 'monthPicks'].map((k) =>
       queryClient.invalidateQueries({ queryKey: [k] }),
     ),
   );
@@ -71,6 +73,24 @@ export function useComment() {
 
 export function useDeleteComment() {
   return useMutation({ mutationFn: (id: string) => api.deleteComment(id), onSuccess: invalidateSnippets });
+}
+
+export function useAddLookbackNote() {
+  return useMutation({
+    mutationFn: ({ snippetId, body }: { snippetId: string; body: string }) => api.addLookbackNote(snippetId, body),
+    onSuccess: invalidateSnippets,
+  });
+}
+
+export function useDeleteLookbackNote() {
+  return useMutation({ mutationFn: (id: string) => api.deleteLookbackNote(id), onSuccess: invalidateSnippets });
+}
+
+export function usePickMonth() {
+  return useMutation({
+    mutationFn: ({ month, snippetId }: { month: string; snippetId: string | null }) => api.pickMonth(month, snippetId),
+    onSuccess: invalidateSnippets,
+  });
 }
 
 export function useNudge() {

@@ -18,9 +18,9 @@ export default function OnboardingFriends() {
         contentContainerStyle={{ paddingHorizontal: gutter + 8, paddingTop: insets.top + 40, paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={type.title}>Who do you want to swap weeks with?</Text>
+        <Text style={type.title}>Share with a few close friends?</Text>
         <Text style={[type.subline, { marginTop: 4, marginBottom: 28 }]}>
-          A few close friends is perfect. Friendships are always mutual.
+          Optional. You choose which moments they see. Friendships are always mutual.
         </Text>
         <InviteButton />
         <InviteCodeEntry />
@@ -34,7 +34,7 @@ export default function OnboardingFriends() {
       </ScrollView>
       <View style={{ paddingHorizontal: gutter + 8, paddingBottom: insets.bottom + 16, gap: 14, alignItems: 'center' }}>
         <PrimaryButton title="Start my week" onPress={finish} style={{ alignSelf: 'stretch' }} />
-        {!n ? <TextButton title="I’ll add friends later" color={colors.ink2} onPress={finish} /> : null}
+        {!n ? <TextButton title="Not now, it’s just for me" color={colors.ink2} onPress={finish} /> : null}
       </View>
     </View>
   );

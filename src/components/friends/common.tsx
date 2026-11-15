@@ -79,7 +79,7 @@ export function ClosingNote({ notPosted, sunday, text = 'That’s everyone’s w
           </View>
         ) : (
           <Text style={[type.small, { textAlign: 'center', marginTop: 8, color: colors.ink3 }]}>
-            {listNames(notPosted.map((f) => f.friend.displayName))} didn’t share that week.
+            {listNames(notPosted.map((f) => f.friend.displayName))} didn’t keep that week.
           </Text>
         )
       ) : null}

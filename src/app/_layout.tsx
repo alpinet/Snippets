@@ -100,6 +100,7 @@ function Gate() {
           <Stack.Screen name="snippet/edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="snippet/[id]" />
           <Stack.Screen name="week/[weekStart]" />
+          <Stack.Screen name="thread/[kind]" />
           <Stack.Screen name="friend/[id]" />
           <Stack.Screen name="friends/manage" />
           <Stack.Screen name="backfill" />
